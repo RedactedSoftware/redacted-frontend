@@ -1,0 +1,46 @@
+.map-section {
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+}
+
+.map-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.time-filter {
+  background: #2d3a5e;
+  color: #ffffff;
+  border: 1px solid #3d4a6e;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.time-filter:focus {
+  outline: none;
+  border-color: #5b6a8e;
+}
+
+.map-container {
+  flex: 1;
+  min-height: 350px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.leaflet-container {
+  background: #1a1f36;
+}
+
+@media (max-width: 768px) {
+  .map-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}

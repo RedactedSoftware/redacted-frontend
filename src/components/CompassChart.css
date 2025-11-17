@@ -1,0 +1,37 @@
+.compass-chart {
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+}
+
+.compass-legend {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 12px;
+  justify-content: center;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.legend-color {
+  width: 40px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.heading-display {
+  text-align: center;
+  margin-top: 12px;
+  font-size: 16px;
+  color: #9ca3af;
+}
+
+.heading-display strong {
+  color: #ffffff;
+  font-size: 18px;
+}

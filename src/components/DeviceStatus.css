@@ -1,0 +1,31 @@
+.device-status {
+  min-height: 400px;
+}
+
+.status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.status-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: #141b2d;
+  border-radius: 8px;
+  border: 1px solid #2d3a5e;
+}
+
+.status-label {
+  font-size: 14px;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.status-value {
+  font-size: 14px;
+  color: #ffffff;
+  font-weight: 600;
+}
