@@ -1,10 +1,11 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { ThemeProvider } from '../components/theme-provider'
 
 export const metadata: Metadata = {
   title: 'GPS Tracker Dashboard',
   description: 'Real-time GPS tracking dashboard',
-    generator: 'v0.app'
+  generator: 'v0.app'
 }
 
 export default function RootLayout({
@@ -13,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link 
           rel="stylesheet" 
@@ -22,7 +23,11 @@ export default function RootLayout({
           crossOrigin=""
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <ThemeProvider attribute="data-theme" defaultTheme="dark" enableSystem>
+          {children}
+        </ThemeProvider>
+      </body>
     </html>
   )
 }

@@ -10,11 +10,59 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #0f1629;
-  color: #ffffff;
+  background: var(--bg);
+  color: var(--text);
   min-height: 100vh;
 }
 
 #root {
   min-height: 100vh;
 }
+
+:root {
+  /* Dark theme (defaults) */
+  --bg: #0f1629;
+  --text: #ffffff;
+  --header-bg: #1a2438;
+  --card-bg: #1e2d44;
+  --panel-bg: #1a2438;
+  --muted: #94a3b8;
+  --accent: #2a3e5a;
+}
+
+/* Light theme overrides - toggled by setting `data-theme="light"` on the document element */
+[data-theme="light"] {
+  --bg: #f8fafc;
+  --text: #0f1729;
+  --header-bg: #e6eef8;
+  --card-bg: #ffffff;
+  --panel-bg: #f1f5f9;
+  --muted: #475569;
+  --accent: #e6f0ff;
+}
+
+/* Generic overrides to make component backgrounds follow the variables. Using !important
+   because many components use Tailwind-generated utility classes with fixed colors. */
+header, .header, .site-header {
+  background: var(--header-bg) !important;
+  color: var(--text) !important;
+}
+
+.rounded-xl, .card, .panel, .metric-card {
+  background: var(--card-bg) !important;
+  color: var(--text) !important;
+}
+
+button, select, .rounded-lg {
+  background: var(--accent) !important;
+  color: var(--text) !important;
+  border-color: rgba(148,163,184,0.12) !important;
+}
+
+.text-white {
+  color: var(--text) !important;
+}
+
+.text-slate-500 { color: var(--muted) !important; }
+.text-slate-400 { color: var(--muted) !important; }
+
