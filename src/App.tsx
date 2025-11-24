@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
+import AuthForm from "@/components/AuthForm";
 
 type Telemetry = {
   device_id: string;
@@ -28,10 +29,10 @@ type Telemetry = {
   // GNSS / env extras
   lat?: number | null;
   lon?: number | null;
-  speed?: number | null;      // km/h in our case
-  altitude?: number | null;   // meters
-  pressure?: number | null;   // hPa
-  direction?: number | null;  // degrees
+  speed?: number | null; // km/h in our case
+  altitude?: number | null; // meters
+  pressure?: number | null; // hPa
+  direction?: number | null; // degrees
 
   created_at: string | number;
   received_at: string | number;
@@ -86,11 +87,17 @@ function formatNumber(value: unknown, digits = 2): string {
 }
 
 export default function Page() {
+  // 🔐 auth state
+  const [token, setToken] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // websocket + telemetry state
   const [connected, setConnected] = useState(false);
   const [last, setLast] = useState<Telemetry | null>(null);
   const [history, setHistory] = useState<Telemetry[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
 
+  // theme state
   const { theme: themeValue, setTheme, resolvedTheme } = useTheme();
   const currentTheme = (resolvedTheme ?? themeValue) as string;
   const [mounted, setMounted] = useState(false);
@@ -99,12 +106,22 @@ export default function Page() {
     setMounted(true);
   }, []);
 
+  // 🔐 check authToken on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem("authToken");
+    if (stored) {
+      setToken(stored);
+    }
+    setAuthChecked(true);
+  }, []);
+
   const envMissing = !WS_URL || WS_URL.trim().length === 0;
   const secureWsUrl = useMemo(() => getSecureWebSocketUrl(WS_URL), []);
 
-  // WebSocket connection
+  // 🛰 WebSocket connection (only when logged in)
   useEffect(() => {
-    if (envMissing) return;
+    if (envMissing || !token) return;
 
     console.log("WS_URL from env:", WS_URL);
     console.log("secureWsUrl used by client:", secureWsUrl);
@@ -191,7 +208,22 @@ export default function Page() {
         // ignore
       }
     };
-  }, [envMissing, secureWsUrl]);
+  }, [envMissing, secureWsUrl, token]);
+
+  // Logout helper: clear token and close websocket
+  function handleLogout() {
+    try {
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem("authToken");
+      }
+    } catch {}
+    try {
+      wsRef.current?.close();
+    } catch {}
+    setToken(null);
+    // keep authChecked true so UI shows login screen
+    setAuthChecked(true);
+  }
 
   const deviceTimestamp = last ? formatTimestamp(last.device_ts) : "N/A";
   const lastReceived = last ? formatTimestamp(last.received_at) : "N/A";
@@ -217,6 +249,17 @@ export default function Page() {
       ? formatNumber(last.temp ?? last.temperature, 1)
       : "N/A";
 
+  // 🔐 auth gate — don’t render anything until we know if there’s a token
+  if (!authChecked) {
+    return null;
+  }
+
+  if (!token) {
+    // no token yet → show login/signup
+    return <AuthForm onAuth={setToken} />;
+  }
+
+  // ✅ logged in → show dashboard
   return (
     <div className="min-h-screen bg-[#0f1729] text-white">
       <header className="border-b border-slate-700/30 bg-[#1a2438]">
@@ -236,6 +279,13 @@ export default function Page() {
                 }}
               >
                 Reset dashboard
+              </button>
+
+              <button
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white border border-red-700/30 hover:bg-red-700 transition-colors"
+                onClick={handleLogout}
+              >
+                Logout
               </button>
 
               <button className="rounded-lg bg-[#2a3e5a] px-4 py-2 text-sm text-white border border-slate-600/30 hover:bg-[#344b68] transition-colors">
@@ -329,7 +379,9 @@ export default function Page() {
 
           {/* Compass Section (SVG) */}
           <div className="rounded-xl bg-[#1e2d44] border border-slate-700/30 p-6">
-            <h2 className="text-lg font-bold text-white mb-4">Compass & Satellite Data Feed</h2>
+            <h2 className="text-lg font-bold text-white mb-4">
+              Compass & Satellite Data Feed
+            </h2>
             <div className="flex flex-col items-center">
               <div className="flex items-center gap-2 mb-6">
                 <div className="h-0.5 w-8 bg-red-500" />
