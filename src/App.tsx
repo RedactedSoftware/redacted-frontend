@@ -7,48 +7,62 @@ type Telemetry = {
   device_id: string;
   device_ts: number | string;
   heading_deg: number;
+
   temp: number | null;
+  // sometimes GNSS payload might use "temperature"
+  temperature?: number | null;
   battery_percent: number | null;
+
   accel_x: number | null;
   accel_y: number | null;
   accel_z: number | null;
+
   gyro_x: number | null;
   gyro_y: number | null;
   gyro_z: number | null;
+
   mag_x: number | null;
   mag_y: number | null;
   mag_z: number | null;
+
+  // GNSS / env extras
   lat?: number | null;
   lon?: number | null;
-  speed?: number | null;       // m/s or km/h, your choice
-  altitude?: number | null;    // meters
-  pressure?: number | null;    // hPa
-  direction?: number | null;   // heading / bearing in degrees
+  speed?: number | null;      // km/h in our case
+  altitude?: number | null;   // meters
+  pressure?: number | null;   // hPa
+  direction?: number | null;  // degrees
 
   created_at: string | number;
   received_at: string | number;
 };
 
+// Next replaces this at build time; safe to use in client code
 const WS_URL = (process.env.NEXT_PUBLIC_WS_URL as string) || "";
 const MAX_HISTORY = 25;
 
 function getSecureWebSocketUrl(url: string): string {
   if (!url) return url;
+
+  // If the page is served over HTTPS, upgrade ws:// to wss://
   if (typeof window !== "undefined" && window.location.protocol === "https:") {
     return url.replace(/^ws:/, "wss:");
   }
+
   return url;
 }
 
 // Safely format epoch seconds or fallback to raw string
 function formatTimestamp(ts: number | string): string {
   if (typeof ts === "number" && Number.isFinite(ts)) {
+    // assume epoch seconds
     return new Date(ts * 1000).toLocaleString();
   }
 
   if (typeof ts === "string") {
     const trimmed = ts.trim();
 
+    // if it's all digits, treat as epoch seconds
     if (/^\d+$/.test(trimmed)) {
       const num = Number.parseInt(trimmed, 10);
       if (Number.isFinite(num)) {
@@ -56,6 +70,7 @@ function formatTimestamp(ts: number | string): string {
       }
     }
 
+    // otherwise assume it's already a human-readable timestamp
     return trimmed;
   }
 
@@ -70,31 +85,7 @@ function formatNumber(value: unknown, digits = 2): string {
   return "N/A";
 }
 
-// 🔧 Key helper: unwrap whatever the WS sends into a Telemetry object
-function extractTelemetry(raw: any): Telemetry | null {
-  if (!raw) return null;
-
-  // Case 1: already telemetry-shaped
-  if (typeof raw.device_id === "string" && typeof raw.heading_deg === "number") {
-    return raw as Telemetry;
-  }
-
-  // Case 2: { type: 'telemetry', payload: { ...telemetry } }
-  if (raw.payload) {
-    const p = raw.payload;
-    if (typeof p.device_id === "string" && typeof p.heading_deg === "number") {
-      return p as Telemetry;
-    }
-    // Case 3: { type:'telemetry', payload:{ payload:{ ...telemetry } } }
-    if (p.payload && typeof p.payload.device_id === "string") {
-      return p.payload as Telemetry;
-    }
-  }
-
-  return null;
-}
-
-export default function App() {
+export default function Page() {
   const [connected, setConnected] = useState(false);
   const [last, setLast] = useState<Telemetry | null>(null);
   const [history, setHistory] = useState<Telemetry[]>([]);
@@ -111,22 +102,22 @@ export default function App() {
   const envMissing = !WS_URL || WS_URL.trim().length === 0;
   const secureWsUrl = useMemo(() => getSecureWebSocketUrl(WS_URL), []);
 
+  // WebSocket connection
   useEffect(() => {
     if (envMissing) return;
 
     console.log("WS_URL from env:", WS_URL);
     console.log("secureWsUrl used by client:", secureWsUrl);
-    console.log("envMissing:", envMissing);
 
     const ws = new WebSocket(secureWsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log("WS opened");
+      console.log("WS connected");
       setConnected(true);
     };
-    ws.onerror = (e) => {
-      console.error("WS error:", e);
+    ws.onerror = (err) => {
+      console.error("WS error:", err);
       setConnected(false);
     };
     ws.onclose = () => {
@@ -138,43 +129,93 @@ export default function App() {
       try {
         console.log("WS raw frame:", e.data);
         const raw = JSON.parse(e.data);
-        console.log("WS parsed:", raw);
 
-        const telemetry = extractTelemetry(raw);
+        // bridge sends: { type: "telemetry", topic, device_id, payload, received_at }
+        const payload = raw && raw.type === "telemetry" && raw.payload ? raw.payload : raw;
 
-        if (telemetry) {
-          console.log("Telemetry extracted:", telemetry);
+        const msg: Telemetry = {
+          // required
+          device_id: payload.device_id,
+          device_ts: payload.device_ts ?? payload.timestamp ?? 0,
+          heading_deg: payload.heading_deg ?? payload.heading ?? 0,
 
-          setLast(telemetry);
+          // core metrics
+          temp: payload.temp ?? null,
+          temperature: payload.temperature ?? null,
+          battery_percent: payload.battery_percent ?? null,
+
+          accel_x: payload.accel_x ?? payload.accelerometer?.x ?? null,
+          accel_y: payload.accel_y ?? payload.accelerometer?.y ?? null,
+          accel_z: payload.accel_z ?? payload.accelerometer?.z ?? null,
+
+          gyro_x: payload.gyro_x ?? payload.gyroscope?.x ?? null,
+          gyro_y: payload.gyro_y ?? payload.gyroscope?.y ?? null,
+          gyro_z: payload.gyro_z ?? payload.gyroscope?.z ?? null,
+
+          mag_x: payload.mag_x ?? payload.magnetometer?.x ?? null,
+          mag_y: payload.mag_y ?? payload.magnetometer?.y ?? null,
+          mag_z: payload.mag_z ?? payload.magnetometer?.z ?? null,
+
+          // GNSS / env
+          lat: payload.lat ?? payload.latitude ?? null,
+          lon: payload.lon ?? payload.longitude ?? null,
+          // NOTE: payload uses speed_kmh / altitude_m / pressure_hpa / direction_deg
+          speed: payload.speed_kmh ?? payload.speed ?? null,
+          altitude: payload.altitude_m ?? payload.altitude ?? null,
+          pressure: payload.pressure_hpa ?? payload.pressure ?? null,
+          direction: payload.direction_deg ?? payload.direction ?? null,
+
+          created_at: payload.created_at ?? raw.created_at ?? "",
+          received_at: raw.received_at ?? payload.received_at ?? "",
+        };
+
+        if (typeof msg.device_id === "string" && !Number.isNaN(msg.heading_deg)) {
+          setLast(msg);
           setHistory((prev) => {
-            const next = [telemetry, ...prev];
+            const next = [msg, ...prev];
             if (next.length > MAX_HISTORY) next.pop();
             return next;
           });
         } else {
-          console.warn("WS message did not contain telemetry in expected shape");
+          console.warn("WS frame missing device_id or heading:", raw);
         }
       } catch (err) {
-        console.error("WS onmessage JSON parse error:", err);
+        console.error("WS message parse error:", err);
       }
     };
 
     return () => {
       try {
         ws.close();
-      } catch {}
+      } catch {
+        // ignore
+      }
     };
   }, [envMissing, secureWsUrl]);
 
-  const deviceTimestamp = useMemo(() => {
-    if (!last) return "N/A";
-    return formatTimestamp(last.device_ts);
-  }, [last]);
+  const deviceTimestamp = last ? formatTimestamp(last.device_ts) : "N/A";
+  const lastReceived = last ? formatTimestamp(last.received_at) : "N/A";
 
-  const lastReceived = useMemo(() => {
-    if (!last) return "N/A";
-    return formatTimestamp(last.received_at);
-  }, [last]);
+  // Speed is already km/h from speed_kmh
+  const speedKmh =
+    last && typeof last.speed === "number" && Number.isFinite(last.speed)
+      ? last.speed
+      : null;
+
+  const locationLabel =
+    last && last.lat != null && last.lon != null
+      ? `${formatNumber(last.lat, 4)}, ${formatNumber(last.lon, 4)}`
+      : "N/A";
+
+  const directionDeg =
+    last && (last.direction != null || last.heading_deg != null)
+      ? formatNumber(last.direction ?? last.heading_deg, 0)
+      : "N/A";
+
+  const temperatureValue =
+    last && (last.temp != null || last.temperature != null)
+      ? formatNumber(last.temp ?? last.temperature, 1)
+      : "N/A";
 
   return (
     <div className="min-h-screen bg-[#0f1729] text-white">
@@ -182,52 +223,25 @@ export default function App() {
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-white">GPS Tracker Dashboard</h1>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap gap-3 items-center">
               <select className="rounded-lg bg-[#2a3e5a] px-4 py-2 text-sm text-white border border-slate-600/30 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option>{last?.device_id || "No devices available"}</option>
               </select>
-              <button className="rounded-lg bg-[#2a3e5a] px-4 py-2 text-sm text-white border border-slate-600/30 hover:bg-[#344b68] transition-colors">
-                °C / km/h
-              </button>
-              <button
-  className="rounded-lg bg-[#2a3e5a] px-4 py-2 text-sm text-white border border-slate-600/30 hover:bg-[#344b68] transition-colors"
-  onClick={() => {
-    setLast(null);
-    setHistory([]);
-  }}
->
-  Reset dashboard
-</button>
-              {/* Optional: demo button if you want a guaranteed fallback */}
-              {/* 
+
               <button
                 className="rounded-lg bg-[#2a3e5a] px-4 py-2 text-sm text-white border border-slate-600/30 hover:bg-[#344b68] transition-colors"
                 onClick={() => {
-                  const now = Math.floor(Date.now() / 1000);
-                  const t: Telemetry = {
-                    device_id: "demo-device-123",
-                    device_ts: now,
-                    heading_deg: Math.random() * 360,
-                    temp: 22 + Math.random() * 5,
-                    battery_percent: 50 + Math.random() * 50,
-                    accel_x: (Math.random() - 0.5) * 2,
-                    accel_y: (Math.random() - 0.5) * 2,
-                    accel_z: 9.81 + (Math.random() - 0.5),
-                    gyro_x: (Math.random() - 0.5) * 5,
-                    gyro_y: (Math.random() - 0.5) * 5,
-                    gyro_z: (Math.random() - 0.5) * 5,
-                    mag_x: 100,
-                    mag_y: -50,
-                    mag_z: 30,
-                    created_at: now,
-                    received_at: now,
-                  };
-                  setLast(t);
+                  setLast(null);
+                  setHistory([]);
                 }}
               >
-                Inject demo data
+                Reset dashboard
               </button>
-              */}
+
+              <button className="rounded-lg bg-[#2a3e5a] px-4 py-2 text-sm text-white border border-slate-600/30 hover:bg-[#344b68] transition-colors">
+                °C / km/h
+              </button>
+
               <button
                 className="rounded-lg px-4 py-2 text-sm border border-slate-600/30 hover:opacity-90 transition-colors flex items-center gap-2"
                 onClick={() => mounted && setTheme(currentTheme === "dark" ? "light" : "dark")}
@@ -252,7 +266,7 @@ export default function App() {
       <div className="px-6 py-3 bg-[#0f1729]">
         <div className="flex items-center gap-2">
           <div className={`h-2 w-2 rounded-full ${connected ? "bg-green-500" : "bg-red-500"}`} />
-          <span className="text-sm text-green-400">
+          <span className={`text-sm ${connected ? "text-green-400" : "text-red-400"}`}>
             {connected ? "Live updates: connected" : "Disconnected"}
           </span>
         </div>
@@ -262,7 +276,8 @@ export default function App() {
         <div className="px-6 py-4">
           <div className="rounded-lg border border-red-900/50 bg-red-950/30 p-4">
             <p className="text-sm text-red-200">
-              Missing env: set <span className="font-mono font-semibold">NEXT_PUBLIC_WS_URL</span>
+              Missing env: set{" "}
+              <span className="font-mono font-semibold">NEXT_PUBLIC_WS_URL</span>
             </p>
           </div>
         </div>
@@ -273,14 +288,18 @@ export default function App() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <MetricCard label="DEVICE ID" value={last?.device_id || "N/A"} unit="" />
           <MetricCard label="DEVICE TIMESTAMP" value={deviceTimestamp} unit="" />
-          <MetricCard label="HEADING" value={formatNumber(last?.heading_deg, 1)} unit="°" />
+          <MetricCard
+            label="HEADING"
+            value={last ? formatNumber(last.heading_deg, 1) : "N/A"}
+            unit="°"
+          />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <MetricCard label="TEMPERATURE" value={formatNumber(last?.temp, 1)} unit="°C" />
+          <MetricCard label="TEMPERATURE" value={temperatureValue} unit="°C" />
           <MetricCard
             label="BATTERY"
-            value={formatNumber(last?.battery_percent, 0)}
+            value={last ? formatNumber(last.battery_percent, 0) : "N/A"}
             unit="%"
           />
           <MetricCard label="LAST RECEIVED" value={lastReceived} unit="" />
@@ -323,6 +342,7 @@ export default function App() {
                   <circle cx="50" cy="50" r="30" fill="none" stroke="#2a3e5a" strokeWidth="0.2" />
                   <circle cx="50" cy="50" r="20" fill="none" stroke="#2a3e5a" strokeWidth="0.2" />
                   <circle cx="50" cy="50" r="10" fill="none" stroke="#2a3e5a" strokeWidth="0.2" />
+
                   <line x1="50" y1="10" x2="50" y2="90" stroke="#2a3e5a" strokeWidth="0.2" />
                   <line x1="10" y1="50" x2="90" y2="50" stroke="#2a3e5a" strokeWidth="0.2" />
                   <line x1="20" y1="20" x2="80" y2="80" stroke="#2a3e5a" strokeWidth="0.2" />
@@ -370,21 +390,34 @@ export default function App() {
           </div>
         </div>
 
-        {/* Placeholder metrics */}
+        {/* GNSS / env metrics */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <MetricCard label="LOCATION" value="N/A" unit="" />
-          <MetricCard label="SPEED" value="N/A" unit="km/h" />
-          <MetricCard label="DIRECTION" value="N/A" unit="°" />
+          <MetricCard label="LOCATION" value={locationLabel} unit="" />
+          <MetricCard
+            label="SPEED"
+            value={speedKmh != null ? formatNumber(speedKmh, 1) : "N/A"}
+            unit="km/h"
+          />
+          <MetricCard label="DIRECTION" value={directionDeg} unit="°" />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <MetricCard label="TEMPERATURE" value="N/A" unit="°C" />
-          <MetricCard label="ALTITUDE" value="N/A" unit="m" />
-          <MetricCard label="PRESSURE" value="N/A" unit="hPa" />
+          <MetricCard label="TEMPERATURE (GNSS)" value={temperatureValue} unit="°C" />
+          <MetricCard
+            label="ALTITUDE"
+            value={last ? formatNumber(last.altitude, 1) : "N/A"}
+            unit="m"
+          />
+          <MetricCard
+            label="PRESSURE"
+            value={last ? formatNumber(last.pressure, 1) : "N/A"}
+            unit="hPa"
+          />
         </div>
 
         {/* Accelerometer & Gyroscope */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Accelerometer */}
           <div className="rounded-xl bg-[#1e2d44] border border-slate-700/30 p-6">
             <h2 className="text-lg font-bold text-white mb-4">Accelerometer (X, Y, Z)</h2>
             <div className="h-64 bg-[#1a2438] rounded-lg border border-slate-700/30 flex items-center justify-center relative">
@@ -414,6 +447,7 @@ export default function App() {
             </div>
           </div>
 
+          {/* Gyroscope */}
           <div className="rounded-xl bg-[#1e2d44] border border-slate-700/30 p-6">
             <h2 className="text-lg font-bold text-white mb-4">Gyroscope (X, Y, Z)</h2>
             <div className="h-64 bg-[#1a2438] rounded-lg border border-slate-700/30 flex items-center justify-center relative">
@@ -449,7 +483,7 @@ export default function App() {
           <div className="rounded-xl bg-[#1e2d44] border border-slate-700/30 p-6">
             <h2 className="text-lg font-bold text-white mb-4">GNSS Details</h2>
             <div className="h-48 bg-[#1a2438] rounded-lg border border-slate-700/30 flex items-center justify-center">
-              <p className="text-slate-500">No GNSS data available</p>
+              <p className="text-slate-500">No GNSS detail view implemented yet</p>
             </div>
           </div>
 
@@ -459,7 +493,7 @@ export default function App() {
               <StatusRow label="System Uptime (s)" value="N/A" />
               <StatusRow label="Health Uptime (s)" value="N/A" />
               <StatusRow label="System Uptime (human)" value="N/A" />
-              <StatusRow label="Last GNSS Fix" value="N/A" />
+              <StatusRow label="Last GNSS Fix" value={lastReceived} />
               <StatusRow label="Signal Strength" value="N/A" />
               <StatusRow label="CPU Temp (°C)" value="N/A" />
             </div>
@@ -474,7 +508,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* IMU + SNR placeholders */}
+        {/* IMU trajectory + SNR placeholders */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="rounded-xl bg-[#1e2d44] border border-slate-700/30 p-6">
             <h2 className="text-lg font-bold text-white mb-4">
