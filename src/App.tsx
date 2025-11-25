@@ -91,7 +91,7 @@ export default function Page() {
   const [token, setToken] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
 
-  // websocket + telemetry state
+  // websocket + telemetry state (live)
   const [connected, setConnected] = useState(false);
   const [last, setLast] = useState<Telemetry | null>(null);
   const [history, setHistory] = useState<Telemetry[]>([]);
@@ -148,7 +148,8 @@ export default function Page() {
         const raw = JSON.parse(e.data);
 
         // bridge sends: { type: "telemetry", topic, device_id, payload, received_at }
-        const payload = raw && raw.type === "telemetry" && raw.payload ? raw.payload : raw;
+        const payload =
+          raw && raw.type === "telemetry" && raw.payload ? raw.payload : raw;
 
         const msg: Telemetry = {
           // required
@@ -186,7 +187,10 @@ export default function Page() {
           received_at: raw.received_at ?? payload.received_at ?? "",
         };
 
-        if (typeof msg.device_id === "string" && !Number.isNaN(msg.heading_deg)) {
+        if (
+          typeof msg.device_id === "string" &&
+          !Number.isNaN(msg.heading_deg)
+        ) {
           setLast(msg);
           setHistory((prev) => {
             const next = [msg, ...prev];
@@ -259,13 +263,15 @@ export default function Page() {
     return <AuthForm onAuth={setToken} />;
   }
 
-  // ✅ logged in → show dashboard
+  // ✅ logged in → show live dashboard
   return (
     <div className="min-h-screen bg-[#0f1729] text-white">
       <header className="border-b border-slate-700/30 bg-[#1a2438]">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-white">GPS Tracker Dashboard</h1>
+            <h1 className="text-2xl font-bold text-white">
+              GPS Tracker Dashboard (Live)
+            </h1>
             <div className="flex flex-wrap gap-3 items-center">
               <select className="rounded-lg bg-[#2a3e5a] px-4 py-2 text-sm text-white border border-slate-600/30 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option>{last?.device_id || "No devices available"}</option>
@@ -281,6 +287,13 @@ export default function Page() {
                 Reset dashboard
               </button>
 
+              <a
+                href="/history"
+                className="rounded-lg bg-[#2a3e5a] px-4 py-2 text-sm text-white border border-slate-600/30 hover:bg-[#344b68] transition-colors"
+              >
+                View history
+              </a>
+
               <button
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm text-white border border-red-700/30 hover:bg-red-700 transition-colors"
                 onClick={handleLogout}
@@ -294,8 +307,11 @@ export default function Page() {
 
               <button
                 className="rounded-lg px-4 py-2 text-sm border border-slate-600/30 hover:opacity-90 transition-colors flex items-center gap-2"
-                onClick={() => mounted && setTheme(currentTheme === "dark" ? "light" : "dark")}
-                aria-pressed={mounted ? currentTheme === "dark" : undefined}
+                onClick={() =>
+                  mounted &&
+                  setTheme(currentTheme === "dark" ? "light" : "dark")
+                }
+                aria-pressed={mounted ? (currentTheme === "dark") : undefined}
               >
                 {mounted ? (
                   <>
@@ -315,8 +331,16 @@ export default function Page() {
 
       <div className="px-6 py-3 bg-[#0f1729]">
         <div className="flex items-center gap-2">
-          <div className={`h-2 w-2 rounded-full ${connected ? "bg-green-500" : "bg-red-500"}`} />
-          <span className={`text-sm ${connected ? "text-green-400" : "text-red-400"}`}>
+          <div
+            className={`h-2 w-2 rounded-full ${
+              connected ? "bg-green-500" : "bg-red-500"
+            }`}
+          />
+          <span
+            className={`text-sm ${
+              connected ? "text-green-400" : "text-red-400"
+            }`}
+          >
             {connected ? "Live updates: connected" : "Disconnected"}
           </span>
         </div>
@@ -327,7 +351,9 @@ export default function Page() {
           <div className="rounded-lg border border-red-900/50 bg-red-950/30 p-4">
             <p className="text-sm text-red-200">
               Missing env: set{" "}
-              <span className="font-mono font-semibold">NEXT_PUBLIC_WS_URL</span>
+              <span className="font-mono font-semibold">
+                NEXT_PUBLIC_WS_URL
+              </span>
             </p>
           </div>
         </div>
@@ -360,7 +386,9 @@ export default function Page() {
           {/* Map Section */}
           <div className="rounded-xl bg-[#1e2d44] border border-slate-700/30 p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-white">GNSS Map & Satellite Sky Plot</h2>
+              <h2 className="text-lg font-bold text-white">
+                GNSS Map & Satellite Sky Plot
+              </h2>
               <select className="rounded-lg bg-[#2a3e5a] px-4 py-2 text-sm text-white border border-slate-600/30 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option>All Time</option>
                 <option>Last Hour</option>
@@ -372,7 +400,9 @@ export default function Page() {
                 <div className="absolute top-4 left-4 bg-[#1e2d44] rounded-full w-10 h-10 flex items-center justify-center border-2 border-white text-sm font-bold">
                   N
                 </div>
-                <p className="text-slate-500">Map View (Integration Required)</p>
+                <p className="text-slate-500">
+                  Map View (Integration Required)
+                </p>
               </div>
             </div>
           </div>
@@ -432,7 +462,9 @@ export default function Page() {
                 <div
                   className="absolute left-1/2 top-1/2 origin-bottom"
                   style={{
-                    transform: `translate(-50%, -50%) rotate(${last?.heading_deg ?? 0}deg)`,
+                    transform: `translate(-50%, -50%) rotate(${
+                      last?.heading_deg ?? 0
+                    }deg)`,
                   }}
                 >
                   <div className="h-16 w-0.5 bg-red-500 -translate-y-16" />
@@ -471,7 +503,9 @@ export default function Page() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Accelerometer */}
           <div className="rounded-xl bg-[#1e2d44] border border-slate-700/30 p-6">
-            <h2 className="text-lg font-bold text-white mb-4">Accelerometer (X, Y, Z)</h2>
+            <h2 className="text-lg font-bold text-white mb-4">
+              Accelerometer (X, Y, Z)
+            </h2>
             <div className="h-64 bg-[#1a2438] rounded-lg border border-slate-700/30 flex items-center justify-center relative">
               <div className="absolute top-4 right-4 flex gap-4 text-xs">
                 <div className="flex items-center gap-2">
@@ -489,9 +523,15 @@ export default function Page() {
               </div>
               {last ? (
                 <div className="text-center">
-                  <div className="text-red-400">X: {formatNumber(last.accel_x)}</div>
-                  <div className="text-green-400">Y: {formatNumber(last.accel_y)}</div>
-                  <div className="text-blue-400">Z: {formatNumber(last.accel_z)}</div>
+                  <div className="text-red-400">
+                    X: {formatNumber(last.accel_x)}
+                  </div>
+                  <div className="text-green-400">
+                    Y: {formatNumber(last.accel_y)}
+                  </div>
+                  <div className="text-blue-400">
+                    Z: {formatNumber(last.accel_z)}
+                  </div>
                 </div>
               ) : (
                 <p className="text-slate-500">No data</p>
@@ -501,7 +541,9 @@ export default function Page() {
 
           {/* Gyroscope */}
           <div className="rounded-xl bg-[#1e2d44] border border-slate-700/30 p-6">
-            <h2 className="text-lg font-bold text-white mb-4">Gyroscope (X, Y, Z)</h2>
+            <h2 className="text-lg font-bold text-white mb-4">
+              Gyroscope (X, Y, Z)
+            </h2>
             <div className="h-64 bg-[#1a2438] rounded-lg border border-slate-700/30 flex items-center justify-center relative">
               <div className="absolute top-4 right-4 flex gap-4 text-xs">
                 <div className="flex items-center gap-2">
@@ -519,9 +561,15 @@ export default function Page() {
               </div>
               {last ? (
                 <div className="text-center">
-                  <div className="text-red-400">X: {formatNumber(last.gyro_x)}</div>
-                  <div className="text-green-400">Y: {formatNumber(last.gyro_y)}</div>
-                  <div className="text-blue-400">Z: {formatNumber(last.gyro_z)}</div>
+                  <div className="text-red-400">
+                    X: {formatNumber(last.gyro_x)}
+                  </div>
+                  <div className="text-green-400">
+                    Y: {formatNumber(last.gyro_y)}
+                  </div>
+                  <div className="text-blue-400">
+                    Z: {formatNumber(last.gyro_z)}
+                  </div>
                 </div>
               ) : (
                 <p className="text-slate-500">No data</p>
@@ -601,7 +649,15 @@ export default function Page() {
   );
 }
 
-function MetricCard({ label, value, unit }: { label: string; value: string; unit: string }) {
+function MetricCard({
+  label,
+  value,
+  unit,
+}: {
+  label: string;
+  value: string;
+  unit: string;
+}) {
   return (
     <div className="rounded-xl bg-[#1e2d44] border border-slate-700/30 p-6 text-center">
       <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">

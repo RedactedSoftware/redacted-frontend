@@ -134,3 +134,47 @@ export const fetchDeviceData = async (deviceId: string) => {
     return generateMockDeviceData()
   }
 }
+
+// Fetch all telemetry for the currently logged-in user (per-account history)
+export const fetchMyTelemetry = async (token: string) => {
+  console.log('[v0] fetchMyTelemetry called, USE_MOCK_DATA:', USE_MOCK_DATA)
+
+  if (!token) throw new Error('Missing auth token')
+
+  if (USE_MOCK_DATA) {
+    // Return an array of mock telemetry rows
+    const now = Date.now()
+    const rows = Array.from({ length: 20 }, (_, i) => ({
+      uid: `row-${i}`,
+      device_id: `device-00${(i % 2) + 1}`,
+      temp: 20 + Math.sin((now + i * 1000) / 20000) * 5,
+      battery_percent: 80 - i,
+      received_at: new Date(now - i * 60000).toISOString(),
+      ts: Math.floor((now - i * 60000) / 1000),
+      lat: 37.7749 + i * 0.0001,
+      lon: -122.4194 + i * 0.0001,
+    }))
+
+    return rows
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/telemetry/my`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store',
+    })
+
+    if (!res.ok) {
+      throw new Error(`Failed to fetch my telemetry: ${res.status} ${res.statusText}`)
+    }
+
+    const rows = await res.json()
+    return rows
+  } catch (err) {
+    console.error('[v0] fetchMyTelemetry error:', err)
+    throw err
+  }
+}

@@ -4,17 +4,18 @@ const BASE =
   process.env.NEXT_PUBLIC_API_URL ||
   process.env.NEXT_PUBLIC_API_BASE ||
   process.env.NEXT_PUBLIC_API_BASE_URL ||
-  '';
+  "";
 
+// Generic helper to call the backend
 function api(url, init) {
   const full = `${BASE}${url}`;
   return fetch(full, {
     ...init,
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       ...(init?.headers || {}),
     },
-    cache: 'no-store',
+    cache: "no-store",
   });
 }
 
@@ -30,20 +31,25 @@ export async function fetchDeviceList() {
 
 // Latest snapshot for cards (1 row → mapped to UI shape)
 export async function fetchDeviceData(deviceId) {
-  if (!deviceId) throw new Error('Missing deviceId');
+  if (!deviceId) throw new Error("Missing deviceId");
 
-  const res = await api(`/telemetry?device_id=${encodeURIComponent(deviceId)}&limit=1`);
+  const res = await api(
+    `/telemetry?device_id=${encodeURIComponent(deviceId)}&limit=1`
+  );
   if (!res.ok) {
-    throw new Error(`Failed to fetch device data: ${res.status} ${res.statusText}`);
+    throw new Error(
+      `Failed to fetch device data: ${res.status} ${res.statusText}`
+    );
   }
 
   const arr = await res.json();
   const r = arr[0] || {};
 
   return {
-    location: (r.lat != null && r.lon != null)
-      ? { latitude: r.lat, longitude: r.lon }
-      : null,
+    location:
+      r.lat != null && r.lon != null
+        ? { latitude: r.lat, longitude: r.lon }
+        : null,
 
     speed: r.speed ?? null,
     direction: r.heading ?? null,
@@ -73,17 +79,21 @@ export async function fetchDeviceData(deviceId) {
 
 // Timeseries for accelerometer charts
 export async function fetchDeviceSeries(deviceId, limit = 200) {
-  if (!deviceId) throw new Error('Missing deviceId');
+  if (!deviceId) throw new Error("Missing deviceId");
 
-  const res = await api(`/telemetry?device_id=${encodeURIComponent(deviceId)}&limit=${limit}`);
+  const res = await api(
+    `/telemetry?device_id=${encodeURIComponent(deviceId)}&limit=${limit}`
+  );
   if (!res.ok) {
-    throw new Error(`Failed to fetch device series: ${res.status} ${res.statusText}`);
+    throw new Error(
+      `Failed to fetch device series: ${res.status} ${res.statusText}`
+    );
   }
 
   const arr = await res.json();
   return arr
     .map((r) => ({
-      time: r.ts ? new Date(r.ts).toLocaleTimeString() : '',
+      time: r.ts ? new Date(r.ts).toLocaleTimeString() : "",
       x: r.accel_x ?? null,
       y: r.accel_y ?? null,
       z: r.accel_z ?? null,
@@ -93,17 +103,21 @@ export async function fetchDeviceSeries(deviceId, limit = 200) {
 
 // Timeseries for gyroscope charts
 export async function fetchGyroSeries(deviceId, limit = 200) {
-  if (!deviceId) throw new Error('Missing deviceId');
+  if (!deviceId) throw new Error("Missing deviceId");
 
-  const res = await api(`/telemetry?device_id=${encodeURIComponent(deviceId)}&limit=${limit}`);
+  const res = await api(
+    `/telemetry?device_id=${encodeURIComponent(deviceId)}&limit=${limit}`
+  );
   if (!res.ok) {
-    throw new Error(`Failed to fetch gyro series: ${res.status} ${res.statusText}`);
+    throw new Error(
+      `Failed to fetch gyro series: ${res.status} ${res.statusText}`
+    );
   }
 
   const arr = await res.json();
   return arr
     .map((r) => ({
-      time: r.ts ? new Date(r.ts).toLocaleTimeString() : '',
+      time: r.ts ? new Date(r.ts).toLocaleTimeString() : "",
       x: r.gyro_x ?? null,
       y: r.gyro_y ?? null,
       z: r.gyro_z ?? null,
@@ -111,3 +125,22 @@ export async function fetchGyroSeries(deviceId, limit = 200) {
     .reverse();
 }
 
+// Fetch all telemetry for the currently logged-in user (per-account history)
+export async function fetchMyTelemetry(token) {
+  if (!token) throw new Error("Missing auth token");
+
+  const res = await api("/api/telemetry/my", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(
+      `Failed to fetch my telemetry: ${res.status} ${res.statusText}`
+    );
+  }
+
+  const rows = await res.json(); // array of telemetry rows
+  return rows;
+}
