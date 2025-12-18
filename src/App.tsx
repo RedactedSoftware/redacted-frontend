@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import AuthForm from "@/components/AuthForm";
+import { DeviceRegisterForm } from "@/components/DeviceRegisterForm";
+import { MyDevicesList } from "@/components/MyDevicesList";
 
 type Telemetry = {
   device_id: string;
@@ -31,6 +33,8 @@ type Telemetry = {
 
 const WS_URL = (process.env.NEXT_PUBLIC_WS_URL as string) || "";
 const MAX_HISTORY = 25;
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8082"; // fallback for local
 
 function getSecureWebSocketUrl(url: string): string {
   if (!url) return url;
@@ -64,6 +68,68 @@ function formatNumber(value: unknown, digits = 2): string {
   return "N/A";
 }
 
+/**
+ * Poll the PUBLIC history endpoint (no auth needed)
+ * and convert the newest row into Telemetry.
+ */
+async function fetchLatestTelemetry(): Promise<Telemetry | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/telemetry/history`, {
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      console.error(
+        "Failed to fetch latest telemetry:",
+        res.status,
+        res.statusText
+      );
+      return null;
+    }
+
+    const rows = (await res.json()) as any[];
+    if (!rows || rows.length === 0) return null;
+
+    const row = rows[0];
+
+    const msg: Telemetry = {
+      device_id: row.device_id,
+      device_ts: row.device_ts ?? row.created_at ?? 0,
+      heading_deg: row.heading_deg ?? 0,
+      temp: row.temp ?? null,
+      temperature: row.temperature ?? null,
+      battery_percent: row.battery_percent ?? null,
+
+      accel_x: row.accel_x ?? null,
+      accel_y: row.accel_y ?? null,
+      accel_z: row.accel_z ?? null,
+
+      gyro_x: row.gyro_x ?? null,
+      gyro_y: row.gyro_y ?? null,
+      gyro_z: row.gyro_z ?? null,
+
+      mag_x: row.mag_x ?? null,
+      mag_y: row.mag_y ?? null,
+      mag_z: row.mag_z ?? null,
+
+      lat: row.latitude ?? row.lat ?? null,
+      lon: row.longitude ?? row.lon ?? null,
+      speed: row.speed_kmh ?? row.speed ?? null,
+      altitude: row.altitude_m ?? row.altitude ?? null,
+      pressure: row.pressure_hpa ?? row.pressure ?? null,
+      direction: row.direction_deg ?? row.heading_deg ?? null,
+
+      created_at: row.created_at ?? "",
+      received_at: row.received_at ?? "",
+    };
+
+    return msg;
+  } catch (err) {
+    console.error("Error in fetchLatestTelemetry:", err);
+    return null;
+  }
+}
+
 export default function Page() {
   const [token, setToken] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
@@ -71,6 +137,7 @@ export default function Page() {
   const [last, setLast] = useState<Telemetry | null>(null);
   const [history, setHistory] = useState<Telemetry[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
+  const [refreshSeconds, setRefreshSeconds] = useState(3); // 1–5s
 
   // read token from localStorage on mount
   useEffect(() => {
@@ -83,7 +150,45 @@ export default function Page() {
   const envMissing = !WS_URL || WS_URL.trim().length === 0;
   const secureWsUrl = useMemo(() => getSecureWebSocketUrl(WS_URL), []);
 
-  // websocket hookup
+  // periodic refresh from REST API (1–5s) for demo stability
+  useEffect(() => {
+    if (!token) return; // only refresh when logged in
+
+    let cancelled = false;
+
+    const tick = async () => {
+      const latest = await fetchLatestTelemetry();
+      if (!latest || cancelled) return;
+
+      setLast(latest);
+      setHistory((prev) => {
+        const next = [latest, ...prev];
+
+        // de-dup by device_id + timestamp-ish
+        const seen = new Set<string>();
+        const deduped: Telemetry[] = [];
+        for (const row of next) {
+          const key = `${row.device_id}-${row.device_ts}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          deduped.push(row);
+          if (deduped.length >= MAX_HISTORY) break;
+        }
+        return deduped;
+      });
+    };
+
+    // initial fetch
+    tick();
+    const id = setInterval(tick, refreshSeconds * 1000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [token, refreshSeconds]);
+
+  // WebSocket hookup (still used for real-time streaming)
   useEffect(() => {
     if (envMissing || !token) return;
 
@@ -172,7 +277,6 @@ export default function Page() {
 
   if (!authChecked) return null;
 
-  // not logged in → show your fancy AuthForm (already styled)
   if (!token) {
     return <AuthForm onAuth={setToken} />;
   }
@@ -251,6 +355,19 @@ export default function Page() {
                 Reset
               </button>
 
+              <div className="flex items-center gap-2 px-3 py-2 bg-slate-950/50 rounded-lg border border-slate-700 text-xs text-slate-300">
+                <span>Refresh</span>
+                <select
+                  className="bg-slate-900/80 border border-slate-700 rounded px-2 py-1 text-xs text-white"
+                  value={refreshSeconds}
+                  onChange={(e) => setRefreshSeconds(Number(e.target.value))}
+                >
+                  <option value={1}>1s</option>
+                  <option value={2}>2s</option>
+                  <option value={5}>5s</option>
+                </select>
+              </div>
+
               <button
                 onClick={handleLogout}
                 className="px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 rounded-lg text-white text-sm font-medium shadow-lg shadow-red-500/30 hover:shadow-red-500/50 hover:scale-105 transition-all"
@@ -263,9 +380,22 @@ export default function Page() {
       </header>
 
       <main className="relative p-6 space-y-6">
+        {/* Devices: Registration + My Devices */}
+        <Card title="Devices">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <DeviceRegisterForm token={token} />
+            <MyDevicesList token={token} />
+          </div>
+        </Card>
+
         {/* Top Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <MetricCard label="DEVICE ID" value={last?.device_id || "N/A"} unit="" icon="📡" />
+          <MetricCard
+            label="DEVICE ID"
+            value={last?.device_id || "N/A"}
+            unit=""
+            icon="📡"
+          />
           <MetricCard
             label="BATTERY"
             value={last ? formatNumber(last.battery_percent, 0) : "N/A"}
