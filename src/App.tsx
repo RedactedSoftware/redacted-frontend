@@ -46,6 +46,12 @@ const MAX_HISTORY = 25;
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8082"; // fallback for local
 
+// Log env on startup
+if (typeof window !== "undefined") {
+  console.log("🔌 Env Check: NEXT_PUBLIC_WS_URL:", WS_URL);
+  console.log("📡 Env Check: NEXT_PUBLIC_API_URL:", API_BASE);
+}
+
 function getSecureWebSocketUrl(url: string): string {
   if (!url) return url;
   if (typeof window !== "undefined" && window.location.protocol === "https:") {
@@ -230,19 +236,27 @@ export default function Page() {
   useEffect(() => {
     if (envMissing || !token || resetPaused) return;
 
+    console.log('🔌 WebSocket: Attempting to connect to:', secureWsUrl);
+    console.log('🔌 WebSocket: Token present:', !!token);
+    console.log('🔌 WebSocket: envMissing:', envMissing);
+
     const ws = new WebSocket(secureWsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log("WS connected");
+      console.log("✅ WS connected successfully");
       setConnected(true);
     };
     ws.onerror = (err) => {
-      console.error("WS error:", err);
+      console.error("❌ WS error event:", err);
+      console.error("🔌 WebSocket readyState:", ws.readyState);
+      console.error("🔌 WebSocket URL was:", secureWsUrl);
       setConnected(false);
     };
-    ws.onclose = () => {
-      console.log("WS closed");
+    ws.onclose = (event) => {
+      console.log("❌ WS closed");
+      console.log("🔌 WebSocket close code:", event.code);
+      console.log("🔌 WebSocket close reason:", event.reason);
       setConnected(false);
     };
 

@@ -41,7 +41,21 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network first for API calls with cache fallback
+  // NEVER cache telemetry data - must always get fresh updates
+  if (url.pathname.includes('/api/telemetry/')) {
+    event.respondWith(
+      fetch(request)
+        .catch(() => {
+          return caches.match(request).then((cachedResponse) => {
+            // Use cache as very last resort for offline
+            return cachedResponse || new Response('Offline', { status: 503 });
+          });
+        })
+    );
+    return;
+  }
+
+  // Network first for other API calls with cache fallback
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(request)
