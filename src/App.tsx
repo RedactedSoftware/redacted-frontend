@@ -1,18 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import AuthForm from "@/components/AuthForm";
-import { DeviceRegisterForm } from "@/components/DeviceRegisterForm";
-import { MyDevicesList } from "@/components/MyDevicesList";
-import Header from "@/components/Header";
-import LegacyMetricCard from "@/components/MetricCard";
-import DeviceStatusPanel from "@/components/DeviceStatus";
-import MapSection from "@/components/MapSection";
-import CompassChart from "@/components/CompassChart";
-import AccelerometerChart from "@/components/AccelerometerChart";
-import GyroscopeChart from "@/components/GyroscopeChart";
-import SatelliteChart from "@/components/SatelliteChart";
-import IMUChart from "@/components/IMUChart";
+import AuthForm from "./components/AuthForm";
+import { DeviceRegisterForm } from "./components/DeviceRegisterForm";
+import { MyDevicesList } from "./components/MyDevicesList";
+import Header from "./components/Header";
+import LegacyMetricCard from "./components/MetricCard";
+import DeviceStatusPanel from "./components/DeviceStatus";
+import MapSection from "./components/MapSection";
+import CompassChart from "./components/CompassChart";
+import AccelerometerChart from "./components/AccelerometerChart";
+import GyroscopeChart from "./components/GyroscopeChart";
+import SatelliteChart from "./components/SatelliteChart";
+import IMUChart from "./components/IMUChart";
 import "./App.css";
 
 type Telemetry = {

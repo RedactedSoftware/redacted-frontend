@@ -6,33 +6,51 @@ type AuthResponse = {
 };
 
 export async function signup(email: string, password: string): Promise<string> {
-  const res = await fetch(`${API_BASE}/api/signup`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  });
+  try {
+    console.log('📤 Signup attempt to:', `${API_BASE}/api/signup`);
+    const res = await fetch(`${API_BASE}/api/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
 
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || 'Signup failed');
+    console.log('📬 Signup response status:', res.status);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      console.error('❌ Signup error response:', data);
+      throw new Error(data.error || `Signup failed: ${res.status} ${res.statusText}`);
+    }
+
+    const data = (await res.json()) as AuthResponse;
+    console.log('✅ Signup successful');
+    return data.token;
+  } catch (err: any) {
+    console.error('❌ Signup exception:', err);
+    throw err;
   }
-
-  const data = (await res.json()) as AuthResponse;
-  return data.token;
 }
 
 export async function login(email: string, password: string): Promise<string> {
-  const res = await fetch(`${API_BASE}/api/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  });
+  try {
+    console.log('📤 Login attempt to:', `${API_BASE}/api/login`);
+    const res = await fetch(`${API_BASE}/api/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
 
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || 'Login failed');
+    console.log('📬 Login response status:', res.status);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      console.error('❌ Login error response:', data);
+      throw new Error(data.error || `Login failed: ${res.status} ${res.statusText}`);
+    }
+
+    const data = (await res.json()) as AuthResponse;
+    console.log('✅ Login successful');
+    return data.token;
+  } catch (err: any) {
+    console.error('❌ Login exception:', err);
+    throw err;
   }
-
-  const data = (await res.json()) as AuthResponse;
-  return data.token;
 }
