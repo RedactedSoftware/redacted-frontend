@@ -50,6 +50,37 @@
 .header-right {
   display: flex;
   gap: 12px;
+  align-items: center;
+}
+
+.ws-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  font-size: 12px;
+}
+
+.ws-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: #dc2626;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+}
+
+.ws-indicator.connected .ws-dot {
+  background: #22c55e;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
+}
+
+.ws-label {
+  color: #e5e7eb;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .toggle-btn {
@@ -65,6 +96,110 @@
 
 .toggle-btn:hover {
   background: #3d4a6e;
+}
+
+.reset-btn {
+  background: #f59e0b;
+  color: #ffffff;
+  border: 1px solid #fbbf24;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  font-weight: 500;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.35);
+  transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+}
+
+.reset-btn:hover {
+  background: #d97706;
+  transform: translateY(-1px);
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.5);
+}
+
+.reset-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+}
+
+.logout-btn {
+  background: #b91c1c;
+  color: #ffffff;
+  border: 1px solid #ef4444;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  font-weight: 500;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.35);
+  transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+}
+
+.logout-btn:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: 0 0 18px rgba(239, 68, 68, 0.5);
+}
+
+.logout-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+/* Light mode tweaks */
+.app.light .header {
+  background: #e6eef8;
+  border-bottom-color: #cbd5f5;
+}
+
+.app.light .header-title {
+  color: #1f2933;
+}
+
+.app.light .device-select,
+.app.light .toggle-btn {
+  background: #ffffff;
+  color: #1f2933;
+  border-color: #cbd5f5;
+}
+
+.app.light .device-select:focus {
+  border-color: #93c5fd;
+}
+
+.app.light .toggle-btn:hover {
+  background: #e5edff;
+}
+
+.app.light .reset-btn {
+  background: #fbbf24;
+  border-color: #fbbf24;
+  color: #1f2933;
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
+}
+
+.app.light .reset-btn:hover {
+  background: #f59e0b;
+}
+
+.app.light .logout-btn {
+  background: #f97373;
+  border-color: #f97373;
+  color: #1f2933;
+  box-shadow: 0 0 10px rgba(248, 113, 113, 0.4);
+}
+
+.app.light .logout-btn:hover {
+  background: #fb6b6b;
+}
+
+.app.light .ws-indicator {
+  background: #ffffff;
+  border-color: #cbd5f5;
+}
+
+.app.light .ws-label {
+  color: #111827;
 }
 
 @media (max-width: 768px) {

@@ -4,6 +4,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import AuthForm from "@/components/AuthForm";
 import { DeviceRegisterForm } from "@/components/DeviceRegisterForm";
 import { MyDevicesList } from "@/components/MyDevicesList";
+import Header from "@/components/Header";
+import LegacyMetricCard from "@/components/MetricCard";
+import DeviceStatusPanel from "@/components/DeviceStatus";
+import MapSection from "@/components/MapSection";
+import CompassChart from "@/components/CompassChart";
+import AccelerometerChart from "@/components/AccelerometerChart";
+import GyroscopeChart from "@/components/GyroscopeChart";
+import SatelliteChart from "@/components/SatelliteChart";
+import IMUChart from "@/components/IMUChart";
+import "./App.css";
 
 type Telemetry = {
   device_id: string;
@@ -65,6 +75,14 @@ function formatNumber(value: unknown, digits = 2): string {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value.toFixed(digits);
   }
+
+  if (typeof value === "string" && value.trim() !== "") {
+    const n = Number(value);
+    if (Number.isFinite(n)) {
+      return n.toFixed(digits);
+    }
+  }
+
   return "N/A";
 }
 
@@ -138,6 +156,12 @@ export default function Page() {
   const [history, setHistory] = useState<Telemetry[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const [refreshSeconds, setRefreshSeconds] = useState(3); // 1–5s
+  const [darkMode, setDarkMode] = useState(true);
+  const [metricUnit, setMetricUnit] = useState<"metric" | "imperial">("metric");
+  const [selectedDevice, setSelectedDevice] = useState<string | "">("");
+  const [timeFilter, setTimeFilter] = useState<string>("all");
+  const [resetPaused, setResetPaused] = useState(false);
+  const lastWSUpdateRef = useRef<number>(0); // track last WebSocket update time
 
   // read token from localStorage on mount
   useEffect(() => {
@@ -147,19 +171,33 @@ export default function Page() {
     setAuthChecked(true);
   }, []);
 
+  // theme toggle: keep colors in sync with CSS variables
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.documentElement.setAttribute(
+      "data-theme",
+      darkMode ? "dark" : "light"
+    );
+  }, [darkMode]);
+
   const envMissing = !WS_URL || WS_URL.trim().length === 0;
   const secureWsUrl = useMemo(() => getSecureWebSocketUrl(WS_URL), []);
 
-  // periodic refresh from REST API (1–5s) for demo stability
+  // periodic refresh from REST API - DISABLED when WebSocket is active
+  // The WebSocket provides real-time data, so REST polling would just overwrite with stale data
+  // Only use REST API if WebSocket never connects (fallback for connectivity issues)
   useEffect(() => {
-    if (!token) return; // only refresh when logged in
+    if (!token || resetPaused || connected) return; // skip if connected to WebSocket or not logged in
 
     let cancelled = false;
 
     const tick = async () => {
+      if (cancelled || connected) return; // re-check connection status
+      
       const latest = await fetchLatestTelemetry();
       if (!latest || cancelled) return;
 
+      console.log("REST API fallback poll updating with:", latest);
       setLast(latest);
       setHistory((prev) => {
         const next = [latest, ...prev];
@@ -186,11 +224,11 @@ export default function Page() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [token, refreshSeconds]);
+  }, [token, refreshSeconds, resetPaused, connected]);
 
   // WebSocket hookup (still used for real-time streaming)
   useEffect(() => {
-    if (envMissing || !token) return;
+    if (envMissing || !token || resetPaused) return;
 
     const ws = new WebSocket(secureWsUrl);
     wsRef.current = ws;
@@ -210,9 +248,12 @@ export default function Page() {
 
     ws.onmessage = (e) => {
       try {
+        console.log("WS raw message:", e.data);
         const raw = JSON.parse(e.data);
+        console.log("WS parsed:", raw);
         const payload =
           raw && raw.type === "telemetry" && raw.payload ? raw.payload : raw;
+        console.log("WS payload:", payload);
 
         const msg: Telemetry = {
           device_id: payload.device_id,
@@ -240,13 +281,21 @@ export default function Page() {
           received_at: raw.received_at ?? payload.received_at ?? "",
         };
 
+        console.log("Final msg object:", msg);
+        console.log("device_id type:", typeof msg.device_id, "value:", msg.device_id);
+        console.log("heading_deg:", msg.heading_deg, "isNaN:", Number.isNaN(msg.heading_deg));
+        
         if (typeof msg.device_id === "string" && !Number.isNaN(msg.heading_deg)) {
+          console.log("✓ Validation passed, updating state from WebSocket");
+          lastWSUpdateRef.current = Date.now(); // Mark that we got WS data
           setLast(msg);
           setHistory((prev) => {
             const next = [msg, ...prev];
             if (next.length > MAX_HISTORY) next.pop();
             return next;
           });
+        } else {
+          console.log("✗ Validation failed");
         }
       } catch (err) {
         console.error("WS message parse error:", err);
@@ -261,6 +310,12 @@ export default function Page() {
       }
     };
   }, [envMissing, secureWsUrl, token]);
+
+  function handleReset() {
+    setLast(null);
+    setHistory([]);
+  }
+ 
 
   function handleLogout() {
     try {
@@ -281,436 +336,225 @@ export default function Page() {
     return <AuthForm onAuth={setToken} />;
   }
 
+  // Render logging
+  console.log("🔄 Page component rendering, last state:", last);
+
+  // derived UI values
   const deviceTimestamp = last ? formatTimestamp(last.device_ts) : "N/A";
   const lastReceived = last ? formatTimestamp(last.received_at) : "N/A";
   const speedKmh =
     last && typeof last.speed === "number" && Number.isFinite(last.speed)
       ? last.speed
       : null;
+
+  const temperatureC =
+    last && (last.temp != null || last.temperature != null)
+      ? Number(formatNumber(last.temp ?? last.temperature, 1))
+      : null;
+
   const locationLabel =
     last && last.lat != null && last.lon != null
       ? `${formatNumber(last.lat, 4)}, ${formatNumber(last.lon, 4)}`
       : "N/A";
-  const directionDeg =
+
+  const directionDegValue =
     last && (last.direction != null || last.heading_deg != null)
-      ? formatNumber(last.direction ?? last.heading_deg, 0)
+      ? Number(formatNumber(last.direction ?? last.heading_deg, 0))
+      : null;
+
+  const directionDisplay =
+    directionDegValue != null && Number.isFinite(directionDegValue)
+      ? `${directionDegValue.toFixed(0)}`
       : "N/A";
-  const temperatureValue =
-    last && (last.temp != null || last.temperature != null)
-      ? formatNumber(last.temp ?? last.temperature, 1)
+
+  const metricSpeedDisplay =
+    speedKmh != null ? formatNumber(speedKmh, 1) : "N/A";
+  const imperialSpeedDisplay =
+    speedKmh != null ? formatNumber(speedKmh * 0.621371, 1) : "N/A";
+
+  const metricTempDisplay =
+    temperatureC != null && Number.isFinite(temperatureC)
+      ? temperatureC.toFixed(1)
+      : "N/A";
+  const imperialTempDisplay =
+    temperatureC != null && Number.isFinite(temperatureC)
+      ? ((temperatureC * 9) / 5 + 32).toFixed(1)
       : "N/A";
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      {/* background grid */}
-      <div className="fixed inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-10" />
+  const temperatureDisplay =
+    metricUnit === "metric" ? metricTempDisplay : imperialTempDisplay;
 
-      {/* Header */}
-      <header className="relative border-b border-slate-800 bg-slate-900/50 backdrop-blur-xl">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-4">
-              <img
-                src="/redacted.png"
-                alt="AEGIS"
-                className="h-12 w-auto drop-shadow-lg"
-              />
-              <div>
-                <h1 className="text-2xl font-bold text-white tracking-tight">
-                  AEGIS TRACKER
-                </h1>
-                <p className="text-xs text-slate-400">
-                  Real-Time Telemetry Dashboard
-                </p>
-              </div>
-            </div>
+  const speedDisplay =
+    metricUnit === "metric" ? metricSpeedDisplay : imperialSpeedDisplay;
 
-            <div className="flex flex-wrap gap-3 items-center">
-              <div className="flex items-center gap-2 px-4 py-2 bg-slate-950/50 rounded-lg border border-slate-700">
-                <div
-                  className={`h-2 w-2 rounded-full ${
-                    connected ? "bg-green-500 animate-pulse" : "bg-red-500"
-                  }`}
-                />
-                <span
-                  className={`text-sm ${
-                    connected ? "text-green-400" : "text-red-400"
-                  }`}
-                >
-                  {connected ? "Connected" : "Offline"}
-                </span>
-              </div>
+  const altitudeDisplay = last ? formatNumber(last.altitude, 1) : "N/A";
+  const pressureDisplay = last ? formatNumber(last.pressure, 1) : "N/A";
 
-              <select className="px-4 py-2 bg-slate-950/50 rounded-lg border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 hover:border-slate-600 transition-all">
-                <option>{last?.device_id || "Select Device"}</option>
-              </select>
+  // simple device list for header dropdown – keeps "My Devices" logic unchanged
+  const headerDevices =
+    last?.device_id != null
+      ? [{ id: last.device_id, name: last.device_id }]
+      : [];
 
-              <button
-                onClick={() => {
-                  setLast(null);
-                  setHistory([]);
-                }}
-                className="px-4 py-2 bg-slate-950/50 rounded-lg border border-slate-700 text-white text-sm hover:bg-slate-800 hover:border-slate-600 transition-all"
-              >
-                Reset
-              </button>
+  const currentHeading =
+    last && !Number.isNaN(last.heading_deg) ? last.heading_deg : 0;
 
-              <div className="flex items-center gap-2 px-3 py-2 bg-slate-950/50 rounded-lg border border-slate-700 text-xs text-slate-300">
-                <span>Refresh</span>
-                <select
-                  className="bg-slate-900/80 border border-slate-700 rounded px-2 py-1 text-xs text-white"
-                  value={refreshSeconds}
-                  onChange={(e) => setRefreshSeconds(Number(e.target.value))}
-                >
-                  <option value={1}>1s</option>
-                  <option value={2}>2s</option>
-                  <option value={5}>5s</option>
-                </select>
-              </div>
+  // chart-friendly history for accelerometer & gyroscope
+  const accelChartData = history.map((row, idx) => ({
+    time: idx.toString(),
+    x: row.accel_x,
+    y: row.accel_y,
+    z: row.accel_z,
+  }));
 
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 rounded-lg text-white text-sm font-medium shadow-lg shadow-red-500/30 hover:shadow-red-500/50 hover:scale-105 transition-all"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+  const gyroChartData = history.map((row, idx) => ({
+    time: idx.toString(),
+    x: row.gyro_x,
+    y: row.gyro_y,
+    z: row.gyro_z,
+  }));
 
-      <main className="relative p-6 space-y-6">
-        {/* Devices: Registration + My Devices */}
-        <Card title="Devices">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <DeviceRegisterForm token={token} />
-            <MyDevicesList token={token} />
-          </div>
-        </Card>
+  const locationForMap =
+    last && last.lat != null && last.lon != null
+      ? { latitude: last.lat, longitude: last.lon }
+      : null;
 
-        {/* Top Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <MetricCard
-            label="DEVICE ID"
-            value={last?.device_id || "N/A"}
-            unit=""
-            icon="📡"
-          />
-          <MetricCard
-            label="BATTERY"
-            value={last ? formatNumber(last.battery_percent, 0) : "N/A"}
-            unit="%"
-            icon="🔋"
-            color="cyan"
-          />
-          <MetricCard
-            label="TEMPERATURE"
-            value={temperatureValue}
-            unit="°C"
-            icon="🌡️"
-            color="orange"
-          />
-          <MetricCard
-            label="HEADING"
-            value={last ? formatNumber(last.heading_deg, 1) : "N/A"}
-            unit="°"
-            icon="🧭"
-            color="blue"
-          />
-        </div>
-
-        {/* Map + Compass */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card title="GNSS Location">
-            <div className="aspect-video bg-slate-950/50 rounded-lg border border-slate-800 overflow-hidden relative">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="text-6xl mb-4">🗺️</div>
-                  <p className="text-slate-400 mb-2">Map Integration Required</p>
-                  <p className="text-sm text-slate-500">
-                    Location: {locationLabel}
-                  </p>
-                </div>
-              </div>
-              <div className="absolute top-4 left-4 bg-slate-900/90 backdrop-blur-sm rounded-lg px-3 py-2 border border-slate-700">
-                <div className="text-xs text-slate-400">Coordinates</div>
-                <div className="text-sm text-white font-mono">
-                  {locationLabel}
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          <Card title="Compass & Direction">
-            <div className="flex flex-col items-center justify-center h-full">
-              <div className="relative w-64 h-64">
-                <svg
-                  className="absolute inset-0 w-full h-full"
-                  viewBox="0 0 100 100"
-                >
-                  <defs>
-                    <radialGradient id="compassGlow" cx="50%" cy="50%" r="50%">
-                      <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.2" />
-                      <stop offset="100%" stopColor="#06b6d4" stopOpacity="0" />
-                    </radialGradient>
-                  </defs>
-                  <circle cx="50" cy="50" r="45" fill="url(#compassGlow)" />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="40"
-                    fill="none"
-                    stroke="#1e293b"
-                    strokeWidth="0.5"
-                  />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="30"
-                    fill="none"
-                    stroke="#1e293b"
-                    strokeWidth="0.5"
-                  />
-                  <circle
-                    cx="50"
-                    cy="50"
-                    r="20"
-                    fill="none"
-                    stroke="#1e293b"
-                    strokeWidth="0.5"
-                  />
-                  <line
-                    x1="50"
-                    y1="10"
-                    x2="50"
-                    y2="90"
-                    stroke="#1e293b"
-                    strokeWidth="0.5"
-                  />
-                  <line
-                    x1="10"
-                    y1="50"
-                    x2="90"
-                    y2="50"
-                    stroke="#1e293b"
-                    strokeWidth="0.5"
-                  />
-                </svg>
-
-                <div className="absolute left-1/2 top-2 -translate-x-1/2 text-xs font-bold text-cyan-400">
-                  N
-                </div>
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-cyan-400">
-                  E
-                </div>
-                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-xs font-bold text-cyan-400">
-                  S
-                </div>
-                <div className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold text-cyan-400">
-                  W
-                </div>
-
-                <div className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-500 shadow-lg shadow-cyan-500/50 z-10" />
-
-                <div
-                  className="absolute left-1/2 top-1/2 origin-bottom transition-transform duration-300"
-                  style={{
-                    transform: `translate(-50%, -50%) rotate(${
-                      last?.heading_deg ?? 0
-                    }deg)`,
-                  }}
-                >
-                  <div className="h-20 w-1 bg-gradient-to-t from-cyan-500 to-cyan-300 -translate-y-20 rounded-full shadow-lg shadow-cyan-500/50" />
-                </div>
-              </div>
-              <div className="mt-4 text-center">
-                <div className="text-3xl font-bold text-cyan-400">
-                  {last ? formatNumber(last.heading_deg, 1) : "0.0"}°
-                </div>
-                <div className="text-sm text-slate-400">Current Heading</div>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Motion sensors */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card title="Accelerometer (g)">
-            <SensorDisplay
-              x={last?.accel_x}
-              y={last?.accel_y}
-              z={last?.accel_z}
-            />
-          </Card>
-
-          <Card title="Gyroscope (dps)">
-            <SensorDisplay
-              x={last?.gyro_x}
-              y={last?.gyro_y}
-              z={last?.gyro_z}
-            />
-          </Card>
-
-          <Card title="Magnetometer (μT)">
-            <SensorDisplay
-              x={last?.mag_x}
-              y={last?.mag_y}
-              z={last?.mag_z}
-            />
-          </Card>
-        </div>
-
-        {/* GNSS data */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <MetricCard
-            label="SPEED"
-            value={speedKmh != null ? formatNumber(speedKmh, 1) : "N/A"}
-            unit="km/h"
-            icon="🚀"
-            color="green"
-          />
-          <MetricCard
-            label="ALTITUDE"
-            value={last ? formatNumber(last.altitude, 1) : "N/A"}
-            unit="m"
-            icon="⛰️"
-          />
-          <MetricCard
-            label="PRESSURE"
-            value={last ? formatNumber(last.pressure, 1) : "N/A"}
-            unit="hPa"
-            icon="🌪️"
-          />
-          <MetricCard
-            label="DIRECTION"
-            value={directionDeg}
-            unit="°"
-            icon="➡️"
-            color="purple"
-          />
-        </div>
-
-        {/* Device status */}
-        <Card title="Device Status & Telemetry">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <StatusRow label="Device Timestamp" value={deviceTimestamp} />
-              <StatusRow label="Last Received" value={lastReceived} />
-              <StatusRow
-                label="Battery Level"
-                value={
-                  last ? `${formatNumber(last.battery_percent, 0)}%` : "N/A"
-                }
-              />
-            </div>
-            <div className="space-y-3">
-              <StatusRow
-                label="Temperature"
-                value={`${temperatureValue}${
-                  temperatureValue !== "N/A" ? " °C" : ""
-                }`}
-              />
-              <StatusRow label="Location" value={locationLabel} />
-              <StatusRow
-                label="Signal Status"
-                value={connected ? "Active" : "Disconnected"}
-              />
-            </div>
-          </div>
-        </Card>
-      </main>
-    </div>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  unit,
-  icon,
-  color = "slate",
-}: {
-  label: string;
-  value: string;
-  unit: string;
-  icon?: string;
-  color?: string;
-}) {
-  const colorClasses = {
-    slate: "from-slate-800 to-slate-900 border-slate-700",
-    cyan: "from-cyan-900/30 to-slate-900 border-cyan-700/50",
-    orange: "from-orange-900/30 to-slate-900 border-orange-700/50",
-    blue: "from-blue-900/30 to-slate-900 border-blue-700/50",
-    green: "from-green-900/30 to-slate-900 border-green-700/50",
-    purple: "from-purple-900/30 to-slate-900 border-purple-700/50",
+  const deviceStatusData = {
+    systemUptime: null,
+    healthUptime: null,
+    lastGnssFix: deviceTimestamp,
+    signalStrength: connected ? "Active" : "Disconnected",
+    cpuTemp: null,
   };
 
   return (
-    <div
-      className={`bg-gradient-to-br ${
-        colorClasses[color as keyof typeof colorClasses]
-      } backdrop-blur-sm border rounded-xl p-6 text-center shadow-xl hover:scale-105 transition-transform`}
-    >
-      {icon && <div className="text-3xl mb-2">{icon}</div>}
-      <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-        {label}
-      </h3>
-      <p className="text-4xl font-bold text-white mb-1">{value}</p>
-      {unit && <p className="text-sm text-slate-400">{unit}</p>}
-    </div>
-  );
-}
+    <div className={`app ${darkMode ? "" : "light"}`}>
+      <Header
+        devices={headerDevices}
+        selectedDevice={selectedDevice}
+        onDeviceChange={(id: string) => setSelectedDevice(id)}
+        darkMode={darkMode}
+        onDarkModeToggle={() => setDarkMode((prev) => !prev)}
+        metricUnit={metricUnit}
+        onMetricToggle={() =>
+          setMetricUnit((prev) => (prev === "metric" ? "imperial" : "metric"))
+        }
+        onReset={handleReset}
+        onLogout={handleLogout}
+        connected={connected}
+      />
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800 rounded-xl p-6 shadow-xl">
-      <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-        <span className="h-2 w-2 rounded-full bg-cyan-500" />
-        {title}
-      </h2>
-      {children}
-    </div>
-  );
-}
+      <div className="dashboard">
+        {/* Devices: Registration + My Devices */}
+        <section className="full-width">
+          <div className="card">
+            <h2 className="section-title">Devices</h2>
+            <div className="two-column-grid">
+              <DeviceRegisterForm token={token} />
+              <MyDevicesList token={token} />
+            </div>
+          </div>
+        </section>
 
-function SensorDisplay({
-  x,
-  y,
-  z,
-}: {
-  x: number | null | undefined;
-  y: number | null | undefined;
-  z: number | null | undefined;
-}) {
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between p-3 bg-slate-950/50 rounded-lg border border-slate-800">
-        <span className="text-sm text-slate-400">X-Axis</span>
-        <span className="text-lg font-bold text-red-400">
-          {formatNumber(x)}
-        </span>
-      </div>
-      <div className="flex items-center justify-between p-3 bg-slate-950/50 rounded-lg border border-slate-800">
-        <span className="text-sm text-slate-400">Y-Axis</span>
-        <span className="text-lg font-bold text-green-400">
-          {formatNumber(y)}
-        </span>
-      </div>
-      <div className="flex items-center justify-between p-3 bg-slate-950/50 rounded-lg border border-slate-800">
-        <span className="text-sm text-slate-400">Z-Axis</span>
-        <span className="text-lg font-bold text-blue-400">
-          {formatNumber(z)}
-        </span>
-      </div>
-    </div>
-  );
-}
+        {/* Key metrics row */}
+        <section className="metrics-grid">
+          <LegacyMetricCard
+            title="Location"
+            value={locationLabel}
+            label="Last known coordinates"
+          />
+          <LegacyMetricCard
+            title="Speed"
+            value={speedDisplay}
+            label={metricUnit === "metric" ? "km/h" : "mph"}
+          />
+          <LegacyMetricCard
+            title="Direction (°)"
+            value={directionDisplay}
+            label="Heading"
+          />
+          <LegacyMetricCard
+            title="Temperature"
+            value={temperatureDisplay}
+            label={metricUnit === "metric" ? "°C" : "°F"}
+          />
+          <LegacyMetricCard
+            title="Altitude"
+            value={altitudeDisplay}
+            label="m"
+          />
+          <LegacyMetricCard
+            title="Pressure"
+            value={pressureDisplay}
+            label="hPa"
+          />
+        </section>
 
-function StatusRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between items-center p-3 bg-slate-950/50 rounded-lg border border-slate-800">
-      <span className="text-sm text-slate-400 font-medium">{label}</span>
-      <span className="text-sm text-white">{value}</span>
+        {/* GNSS details + device status */}
+        <section className="two-column-grid">
+          <div className="card">
+            <h2 className="card-title">GNSS Details</h2>
+            <div className="empty-state">
+              {locationLabel === "N/A"
+                ? "Waiting for GNSS data…"
+                : `Tracking device at ${locationLabel}`}
+            </div>
+          </div>
+
+          <DeviceStatusPanel data={deviceStatusData} />
+        </section>
+
+        {/* Map + compass / heading */}
+        <section className="two-column-grid">
+          <MapSection
+            location={locationForMap ?? undefined}
+            timeFilter={timeFilter}
+            onTimeFilterChange={setTimeFilter}
+          />
+          <CompassChart heading={currentHeading} />
+        </section>
+
+        {/* IMU + satellite signal */}
+        <section className="two-column-grid">
+          <IMUChart data={[]} />
+          <SatelliteChart data={[]} />
+        </section>
+
+        {/* Motion sensor charts */}
+        <section className="two-column-grid">
+          <AccelerometerChart chartData={accelChartData} />
+          <GyroscopeChart chartData={gyroChartData} />
+        </section>
+
+        {/* Connection + timestamps summary */}
+        <section className="full-width">
+          <div className="card">
+            <h2 className="card-title">Connection & Telemetry Summary</h2>
+            <div className="status-list">
+              <div className="status-item">
+                <span className="status-label">WebSocket Status</span>
+                <span className="status-value">
+                  {connected ? "Connected" : "Disconnected"}
+                </span>
+              </div>
+              <div className="status-item">
+                <span className="status-label">Device Timestamp</span>
+                <span className="status-value">{deviceTimestamp}</span>
+              </div>
+              <div className="status-item">
+                <span className="status-label">Last Received</span>
+                <span className="status-value">{lastReceived}</span>
+              </div>
+              <div className="status-item">
+                <span className="status-label">Battery Level</span>
+                <span className="status-value">
+                  {last ? `${formatNumber(last.battery_percent, 0)}%` : "N/A"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

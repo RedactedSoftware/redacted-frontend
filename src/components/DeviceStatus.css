@@ -29,3 +29,17 @@
   color: #ffffff;
   font-weight: 600;
 }
+
+/* Light mode tweaks */
+.app.light .status-item {
+  background: #f1f5f9;
+  border-color: #d1d5db;
+}
+
+.app.light .status-label {
+  color: #4b5563;
+}
+
+.app.light .status-value {
+  color: #111827;
+}

@@ -1,26 +1,31 @@
-import React from 'react'
-import './Header.css'
+import React from "react";
+import "./Header.css";
 
-function Header({ 
-  devices, 
-  selectedDevice, 
-  onDeviceChange, 
-  darkMode, 
+function Header({
+  devices,
+  selectedDevice,
+  onDeviceChange,
+  darkMode,
   onDarkModeToggle,
   metricUnit,
-  onMetricToggle 
+  onMetricToggle,
+  onLogout,
+  connected,
+  onReset,
 }) {
   return (
     <header className="header">
       <div className="header-content">
         <div className="header-left">
-          <h1 className="header-title">GPS Tracker Dashboard</h1>
+          <h1 className="header-title">Aegis Tracker Dashboard</h1>
           <select
             className="device-select"
-            value={selectedDevice || ''}
+            value={selectedDevice || ""}
             onChange={(e) => onDeviceChange(e.target.value)}
           >
-            {devices.length === 0 && <option value="">No devices available</option>}
+            {devices.length === 0 && (
+              <option value="">No devices available</option>
+            )}
             {devices.map((device) => (
               <option key={device.id} value={device.id}>
                 {device.name || device.id}
@@ -30,16 +35,28 @@ function Header({
         </div>
 
         <div className="header-right">
+          <div className={`ws-indicator ${connected ? "connected" : "disconnected"}`}>
+            <span className="ws-dot" />
+            <span className="ws-label">
+              Bridge {connected ? "Online" : "Offline"}
+            </span>
+          </div>
           <button className="toggle-btn" onClick={onMetricToggle}>
-            {metricUnit === 'metric' ? '°C / km/h' : '°F / mph'}
+            {metricUnit === "metric" ? "°C / km/h" : "°F / mph"}
           </button>
           <button className="toggle-btn" onClick={onDarkModeToggle}>
-            {darkMode ? '🌙 Dark' : '☀️ Light'}
+            {darkMode ? "🌙 Dark" : "☀️ Light"}
+          </button>
+          <button className="reset-btn" onClick={onReset}>
+            Reset Dashboard
+          </button>
+          <button className="logout-btn" onClick={onLogout}>
+            Logout
           </button>
         </div>
       </div>
     </header>
-  )
+  );
 }
 
-export default Header
+export default Header;

@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || "http://YOUR_EC2_IP_HERE:8082";
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8082";
 
 type DeviceRegisterFormProps = {
   token: string | null;

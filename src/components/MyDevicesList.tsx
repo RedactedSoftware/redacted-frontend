@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || "http://YOUR_EC2_IP_HERE:8082";
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8082";
 
 type Device = {
   device_id: string;
@@ -52,7 +52,7 @@ export function MyDevicesList({ token }: MyDevicesListProps) {
   }
 
   useEffect(() => {
-    loadDevices();
+    void loadDevices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
@@ -61,7 +61,8 @@ export function MyDevicesList({ token }: MyDevicesListProps) {
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-white">My Devices</h2>
         <button
-          onClick={loadDevices}
+          type="button"
+          onClick={() => void loadDevices()}
           className="text-xs border rounded px-2 py-1 border-slate-700 text-slate-200 hover:bg-slate-800 transition-colors"
         >
           Refresh
