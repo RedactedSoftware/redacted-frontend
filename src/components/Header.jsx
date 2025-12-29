@@ -41,6 +41,12 @@ function Header({
               Bridge {connected ? "Online" : "Offline"}
             </span>
           </div>
+
+          {/* Navigation links */}
+          <a href="/map" className="nav-link" title="View live map">
+            🗺️ Map
+          </a>
+          
           <button className="toggle-btn" onClick={onMetricToggle}>
             {metricUnit === "metric" ? "°C / km/h" : "°F / mph"}
           </button>

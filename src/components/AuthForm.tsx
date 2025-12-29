@@ -93,7 +93,7 @@ export default function AuthForm({ onAuth }: AuthFormProps) {
           {/* Logo */}
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-xl bg-gradient-to-br from-cyan-400 via-cyan-500 to-blue-600 shadow-[0_0_50px_rgba(6,182,212,0.6)] relative">
             <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 animate-pulse opacity-50" />
-            <span className="text-4xl font-black text-white relative z-10">Æ</span>
+            <img src="/aegis-tracker.png" alt="AEGIS Tracker Logo" className="w-16 h-16 relative z-10 object-contain" />
           </div>
 
           <div>

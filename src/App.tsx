@@ -6,8 +6,6 @@ import { DeviceRegisterForm } from "./components/DeviceRegisterForm";
 import { MyDevicesList } from "./components/MyDevicesList";
 import Header from "./components/Header";
 import LegacyMetricCard from "./components/MetricCard";
-import DeviceStatusPanel from "./components/DeviceStatus";
-import MapSection from "./components/MapSection";
 import CompassChart from "./components/CompassChart";
 import AccelerometerChart from "./components/AccelerometerChart";
 import GyroscopeChart from "./components/GyroscopeChart";
@@ -165,7 +163,6 @@ export default function Page() {
   const [darkMode, setDarkMode] = useState(true);
   const [metricUnit, setMetricUnit] = useState<"metric" | "imperial">("metric");
   const [selectedDevice, setSelectedDevice] = useState<string | "">("");
-  const [timeFilter, setTimeFilter] = useState<string>("all");
   const [resetPaused, setResetPaused] = useState(false);
   const lastWSUpdateRef = useRef<number>(0); // track last WebSocket update time
 
@@ -428,19 +425,6 @@ export default function Page() {
     z: row.gyro_z,
   }));
 
-  const locationForMap =
-    last && last.lat != null && last.lon != null
-      ? { latitude: last.lat, longitude: last.lon }
-      : null;
-
-  const deviceStatusData = {
-    systemUptime: null,
-    healthUptime: null,
-    lastGnssFix: deviceTimestamp,
-    signalStrength: connected ? "Active" : "Disconnected",
-    cpuTemp: null,
-  };
-
   return (
     <div className={`app ${darkMode ? "" : "light"}`}>
       <Header
@@ -502,30 +486,6 @@ export default function Page() {
             value={pressureDisplay}
             label="hPa"
           />
-        </section>
-
-        {/* GNSS details + device status */}
-        <section className="two-column-grid">
-          <div className="card">
-            <h2 className="card-title">GNSS Details</h2>
-            <div className="empty-state">
-              {locationLabel === "N/A"
-                ? "Waiting for GNSS data…"
-                : `Tracking device at ${locationLabel}`}
-            </div>
-          </div>
-
-          <DeviceStatusPanel data={deviceStatusData} />
-        </section>
-
-        {/* Map + compass / heading */}
-        <section className="two-column-grid">
-          <MapSection
-            location={locationForMap ?? undefined}
-            timeFilter={timeFilter}
-            onTimeFilterChange={setTimeFilter}
-          />
-          <CompassChart heading={currentHeading} />
         </section>
 
         {/* IMU + satellite signal */}

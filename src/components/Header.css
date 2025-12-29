@@ -83,6 +83,26 @@
   text-transform: uppercase;
 }
 
+.nav-link {
+  background: #2d3a5e;
+  color: #06b6d4;
+  border: 1px solid #3d4a6e;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.2s, border-color 0.2s;
+  display: inline-block;
+  font-weight: 500;
+}
+
+.nav-link:hover {
+  background: #3d4a6e;
+  border-color: #06b6d4;
+  color: #67e8f9;
+}
+
 .toggle-btn {
   background: #2d3a5e;
   color: #ffffff;
@@ -200,6 +220,18 @@
 
 .app.light .ws-label {
   color: #111827;
+}
+
+.app.light .nav-link {
+  background: #ffffff;
+  color: #0891b2;
+  border-color: #cbd5f5;
+}
+
+.app.light .nav-link:hover {
+  background: #e5edff;
+  border-color: #0891b2;
+  color: #06b6d4;
 }
 
 @media (max-width: 768px) {

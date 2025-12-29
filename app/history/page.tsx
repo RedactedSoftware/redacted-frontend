@@ -104,6 +104,12 @@ export default function HistoryPage() {
 
           <div className="flex gap-3 items-center">
             <a
+              href="/map"
+              className="rounded-lg bg-cyan-600 px-4 py-2 text-sm text-white hover:bg-cyan-500 transition-colors"
+            >
+              🗺️ View Map
+            </a>
+            <a
               href="/"
               className="rounded-lg bg-[#2a3e5a] px-4 py-2 text-sm text-white border border-slate-600/30 hover:bg-[#344b68] transition-colors"
             >
