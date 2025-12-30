@@ -119,8 +119,12 @@ function MapPageContent() {
           }
         }
 
-        ws.onerror = (err) => console.error('❌ WS error:', err)
-        ws.onclose = () => console.log('❌ WS closed')
+        ws.onerror = (err: any) => {
+          console.error('❌ WS error - Code:', err?.code || 'unknown', '- Message:', err?.message || 'WebSocket connection error')
+        }
+        ws.onclose = (evt: any) => {
+          console.log('❌ WS closed - Code:', evt?.code || 'unknown', '- Reason:', evt?.reason || 'Connection closed')
+        }
       } catch (err) {
         console.error('Failed to connect WebSocket:', err)
       }

@@ -2,17 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
-import {
-  fetchTelemetryHistory,
-  TelemetryHistoryItem,
-} from "@/api/fetchTelemetryHistory";
+import Link from "next/link";
 
-type HistoryRow = {
-  uid: string;
+type Session = {
+  id: string;
   device_id: string;
-  temp: number | string | null;
-  battery_percent: number | null;
-  received_at: string;
+  started_at: string;
+  ended_at: string;
+  label: string | null;
 };
 
 function formatNumber(value: unknown, digits = 1): string {
@@ -26,6 +23,22 @@ function formatNumber(value: unknown, digits = 1): string {
   return "—";
 }
 
+function formatDuration(startedAt: string, endedAt: string): string {
+  try {
+    const start = new Date(startedAt).getTime();
+    const end = new Date(endedAt).getTime();
+    const durationMs = end - start;
+    const durationMins = Math.floor(durationMs / 60000);
+    
+    if (durationMins < 60) return `${durationMins} min`;
+    const hours = Math.floor(durationMins / 60);
+    const mins = durationMins % 60;
+    return `${hours}h ${mins}m`;
+  } catch {
+    return "N/A";
+  }
+}
+
 export default function HistoryPage() {
   // theme
   const { theme: themeValue, setTheme, resolvedTheme } = useTheme();
@@ -33,7 +46,7 @@ export default function HistoryPage() {
   const [mounted, setMounted] = useState(false);
 
   // history data
-  const [rows, setRows] = useState<HistoryRow[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,7 +54,7 @@ export default function HistoryPage() {
     setMounted(true);
   }, []);
 
-  // load history on mount (no auth needed)
+  // load sessions from API
   useEffect(() => {
     let cancelled = false;
 
@@ -50,26 +63,39 @@ export default function HistoryPage() {
         setLoading(true);
         setError(null);
 
-        const data: TelemetryHistoryItem[] = await fetchTelemetryHistory();
+        const token = localStorage.getItem("token");
+        if (!token) {
+          throw new Error("No token found - please log in");
+        }
+
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8082";
+        const response = await fetch(`${API_BASE}/api/sessions/history`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error("Unauthorized - please log in");
+          }
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data: Session[] = await response.json();
 
         if (!cancelled) {
-          setRows(
-            (data || []).map((r) => ({
-              uid: r.uid,
-              device_id: r.device_id,
-              temp: r.temp,
-              battery_percent: r.battery_percent,
-              received_at: (r.received_at ?? r.created_at) as string,
-            }))
-          );
+          setSessions(data || []);
         }
       } catch (err: any) {
-        console.error("History load failed:", err);
+        console.error("Sessions load failed:", err);
         if (!cancelled) {
           const msg =
             err && err.message
               ? String(err.message)
-              : "Failed to load history";
+              : "Failed to load session history";
           setError(msg);
         }
       } finally {
@@ -84,40 +110,63 @@ export default function HistoryPage() {
     };
   }, []);
 
-  const totalSamples = rows.length;
-  const devices = Array.from(new Set(rows.map((r) => r.device_id)));
-  const firstTs = rows[rows.length - 1]?.received_at;
-  const lastTs = rows[0]?.received_at;
+  const totalSessions = sessions.length;
+  const devices = Array.from(new Set(sessions.map((s) => s.device_id)));
+  const firstTs = sessions[sessions.length - 1]?.started_at;
+  const lastTs = sessions[0]?.started_at;
+
+  const formatDateShort = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    
+    const month = monthNames[date.getUTCMonth()];
+    const day = date.getUTCDate();
+    const year = date.getUTCFullYear().toString().slice(-2);
+    const hours = String(date.getUTCHours()).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    const dayName = dayNames[date.getUTCDay()];
+    
+    return {
+      date: `${month} ${day}`,
+      time: `${hours}:${minutes}`,
+      full: `${dayName}, ${month} ${day}, ${year} ${hours}:${minutes}`
+    };
+  };
 
   return (
     <div className="min-h-screen bg-[#0f1729] text-white">
-      <header className="border-b border-slate-700/30 bg-[#1a2438]">
-        <div className="px-6 py-4 flex items-center justify-between">
+      <header className="border-b border-slate-700/30 bg-[#1a2438] sticky top-0 z-50">
+        <div className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-white">
-              GPS Tracker History
+            <h1 className="text-xl sm:text-2xl font-bold text-white">
+              Session History
             </h1>
             <p className="text-xs text-slate-400">
-              Past telemetry for all recorded devices
+              View your recorded tracking sessions
             </p>
           </div>
 
-          <div className="flex gap-3 items-center">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
             <a
               href="/map"
-              className="rounded-lg bg-cyan-600 px-4 py-2 text-sm text-white hover:bg-cyan-500 transition-colors"
+              className="flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg bg-gradient-to-r from-cyan-600 to-cyan-500 text-white font-medium text-xs sm:text-sm shadow-lg shadow-cyan-600/30 hover:shadow-cyan-600/50 hover:from-cyan-500 hover:to-cyan-400 transition-all duration-200 hover:translate-y-[-2px]"
             >
-              🗺️ View Map
+              <span className="text-lg">🗺️</span>
+              <span className="hidden sm:inline">View Live Map</span>
+              <span className="sm:hidden">Live Map</span>
             </a>
             <a
               href="/"
-              className="rounded-lg bg-[#2a3e5a] px-4 py-2 text-sm text-white border border-slate-600/30 hover:bg-[#344b68] transition-colors"
+              className="flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg bg-gradient-to-r from-slate-700 to-slate-600 text-white font-medium text-xs sm:text-sm border border-slate-500/40 shadow-lg shadow-slate-700/30 hover:shadow-slate-700/50 hover:from-slate-600 hover:to-slate-500 transition-all duration-200 hover:translate-y-[-2px] hover:border-slate-500/60"
             >
-              Back to live
+              <span className="text-lg">📊</span>
+              <span className="hidden sm:inline">Back to Dashboard</span>
+              <span className="sm:hidden">Dashboard</span>
             </a>
 
             <button
-              className="rounded-lg px-4 py-2 text-sm border border-slate-600/30 hover:opacity-90 transition-colors flex items-center gap-2"
+              className="flex items-center justify-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg bg-slate-700/50 border border-slate-600/30 text-white font-medium text-xs sm:text-sm hover:bg-slate-600/50 transition-all duration-200"
               onClick={() =>
                 mounted &&
                 setTheme(currentTheme === "dark" ? "light" : "dark")
@@ -126,106 +175,108 @@ export default function HistoryPage() {
             >
               {mounted ? (
                 <>
-                  <span className="text-yellow-400">
+                  <span className="text-lg">
                     {currentTheme === "dark" ? "🌙" : "☀️"}
                   </span>
-                  {currentTheme === "dark" ? "Dark" : "Light"}
+                  <span className="hidden sm:inline">
+                    {currentTheme === "dark" ? "Dark" : "Light"}
+                  </span>
                 </>
               ) : (
-                <span className="text-sm">Theme</span>
+                <span>Theme</span>
               )}
             </button>
           </div>
         </div>
       </header>
 
-      <main className="p-6 space-y-6">
+      <main className="p-4 sm:p-6 space-y-6">
         {/* Summary cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <SummaryCard
-            label="Total Samples"
-            value={totalSamples.toString()}
-            helper="Rows of telemetry in history"
+            label="Total Sessions"
+            value={totalSessions.toString()}
+            icon="📊"
+            helper={totalSessions === 1 ? "1 recorded session" : `${totalSessions} recorded sessions`}
           />
           <SummaryCard
-            label="Devices"
+            label="Devices Tracked"
             value={devices.length.toString()}
-            helper={devices.join(", ") || "No devices"}
+            icon="📱"
+            helper={devices.length === 1 ? "1 device" : `${devices.length} unique devices`}
           />
           <SummaryCard
-            label="Time Range"
-            value={
-              firstTs && lastTs
-                ? `${new Date(firstTs).toLocaleString()} → ${new Date(
-                    lastTs
-                  ).toLocaleString()}`
-                : "N/A"
-            }
-            helper="Oldest to newest in this view"
+            label="Time Span"
+            value={firstTs && lastTs ? formatDateShort(firstTs).date : "—"}
+            icon="📅"
+            helper={firstTs && lastTs ? `${formatDateShort(firstTs).time} to ${formatDateShort(lastTs).time}` : "No sessions"}
           />
         </div>
 
-        {/* History table */}
-        <section className="rounded-xl bg-[#1e2d44] border border-slate-700/30 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-white">
-              Telemetry history (raw)
+        {/* Sessions list */}
+        <section className="rounded-xl bg-[#1e2d44] border border-slate-700/30 p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              📋 Your Sessions
             </h2>
             {loading && (
-              <span className="text-xs text-slate-300">Loading…</span>
+              <span className="text-xs text-slate-300 animate-pulse">Loading…</span>
             )}
           </div>
 
           {error && (
-            <p className="text-sm text-red-400 mb-3">
-              {error || "Error loading history"}
-            </p>
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-4">
+              <p className="text-sm text-red-300">{error}</p>
+            </div>
           )}
 
-          {!loading && !error && (
-            <div className="max-h-[480px] overflow-auto border border-slate-700/50 rounded-lg">
-              <table className="w-full text-xs">
-                <thead className="bg-[#111827] sticky top-0 z-10">
-                  <tr>
-                    <th className="p-2 text-left">Time</th>
-                    <th className="p-2 text-left">Device</th>
-                    <th className="p-2 text-left">Temp (°C)</th>
-                    <th className="p-2 text-left">Battery (%)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.uid}>
-                      <td className="p-2 border-t border-slate-700/40">
-                        {row.received_at
-                          ? new Date(row.received_at).toLocaleString()
-                          : "—"}
-                      </td>
-                      <td className="p-2 border-t border-slate-700/40">
-                        {row.device_id}
-                      </td>
-                      <td className="p-2 border-t border-slate-700/40">
-                        {formatNumber(row.temp, 1)}
-                      </td>
-                      <td className="p-2 border-t border-slate-700/40">
-                        {row.battery_percent == null
-                          ? "—"
-                          : `${row.battery_percent}%`}
-                      </td>
-                    </tr>
-                  ))}
-                  {rows.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={4}
-                        className="p-3 text-center text-slate-400 border-t border-slate-700/40"
-                      >
-                        No historical telemetry found yet.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+          {!loading && !error && sessions.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-slate-400">No sessions recorded yet</p>
+            </div>
+          )}
+
+          {!loading && !error && sessions.length > 0 && (
+            <div className="space-y-3 max-h-[600px] overflow-y-auto">
+              {sessions.map((session) => {
+                const startInfo = formatDateShort(session.started_at);
+                const endInfo = session.ended_at ? formatDateShort(session.ended_at) : null;
+                const duration = session.ended_at ? formatDuration(session.started_at, session.ended_at) : "In progress";
+                
+                return (
+                  <div
+                    key={session.id}
+                    className="bg-[#0f1729] border border-slate-700/40 rounded-lg p-3 sm:p-4 hover:border-cyan-500/50 hover:bg-[#152541] transition-all cursor-pointer group"
+                  >
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 sm:gap-3 mb-2">
+                          <div className="text-lg flex-shrink-0">🕐</div>
+                          <div className="min-w-0">
+                            <div className="font-semibold text-white text-sm sm:text-base truncate">
+                              {startInfo.date} at {startInfo.time}
+                            </div>
+                            <div className="text-xs text-slate-400 truncate">
+                              {session.label || `Session ID: ${session.id}`}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 ml-6 sm:ml-7">
+                          <span className="text-xs bg-slate-700/40 text-slate-300 px-2 py-1 rounded whitespace-nowrap">
+                            📱 {session.device_id.substring(0, 12)}...
+                          </span>
+                          <span className="text-xs bg-cyan-900/40 text-cyan-300 px-2 py-1 rounded whitespace-nowrap">
+                            ⏱️ {duration}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-2xl group-hover:translate-x-1 transition-transform flex-shrink-0 hidden sm:block">
+                        →
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>
@@ -237,18 +288,23 @@ export default function HistoryPage() {
 function SummaryCard({
   label,
   value,
+  icon,
   helper,
 }: {
   label: string;
   value: string;
+  icon?: string;
   helper?: string;
 }) {
   return (
-    <div className="rounded-xl bg-[#1e2d44] border border-slate-700/30 p-4">
-      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-        {label}
+    <div className="rounded-xl bg-[#1e2d44] border border-slate-700/30 p-4 hover:border-slate-600/50 transition-colors">
+      <div className="flex items-start justify-between mb-2">
+        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+          {label}
+        </div>
+        {icon && <span className="text-xl">{icon}</span>}
       </div>
-      <div className="text-2xl font-bold text-white mb-1 truncate">{value}</div>
+      <div className="text-2xl font-bold text-white mb-1">{value}</div>
       {helper && (
         <div className="text-[11px] text-slate-400 leading-snug">
           {helper}

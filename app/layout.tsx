@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { ThemeProvider } from '../components/theme-provider'
+import MobileNav from '../components/MobileNav'
+import MobileLayoutWrapper from '../components/MobileLayoutWrapper'
 
 export const metadata: Metadata = {
   title: 'GPS Tracker Dashboard',
@@ -65,7 +67,10 @@ export default function RootLayout({
       </head>
       <body>
         <ThemeProvider attribute="data-theme" defaultTheme="dark" enableSystem>
-          {children}
+          <MobileLayoutWrapper>
+            <MobileNav />
+            {children}
+          </MobileLayoutWrapper>
         </ThemeProvider>
       </body>
     </html>

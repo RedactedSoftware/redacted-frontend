@@ -48,6 +48,13 @@ export async function login(email: string, password: string): Promise<string> {
 
     const data = (await res.json()) as AuthResponse;
     console.log('✅ Login successful');
+    
+    // Save token to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('token', data.token);
+      console.log('💾 Token saved to localStorage');
+    }
+    
     return data.token;
   } catch (err: any) {
     console.error('❌ Login exception:', err);

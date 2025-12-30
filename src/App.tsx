@@ -96,12 +96,22 @@ function formatNumber(value: unknown, digits = 2): string {
  */
 async function fetchLatestTelemetry(): Promise<Telemetry | null> {
   try {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      console.warn("No token found - skipping telemetry fetch");
+      return null;
+    }
+
     const res = await fetch(`${API_BASE}/api/telemetry/history`, {
       cache: "no-store",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
     });
 
     if (!res.ok) {
-      console.error(
+      console.warn(
         "Failed to fetch latest telemetry:",
         res.status,
         res.statusText
