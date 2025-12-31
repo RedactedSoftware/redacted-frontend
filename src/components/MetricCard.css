@@ -3,6 +3,19 @@
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  border-left: 4px solid #4b5563;
+  transition: all 0.3s ease;
+}
+
+.metric-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.metric-card-content {
+  flex: 1;
   text-align: center;
 }
 
@@ -10,9 +23,16 @@
   font-size: 14px;
   font-weight: 500;
   color: #9ca3af;
-  margin-bottom: 12px;
+  margin-bottom: 4px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.metric-subtitle {
+  font-size: 13px;
+  color: #60a5fa;
+  margin-bottom: 12px;
+  font-weight: 500;
 }
 
 .metric-value {
@@ -25,10 +45,82 @@
 .metric-label {
   font-size: 12px;
   color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.metric-helper {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 8px;
+  line-height: 1.4;
+  font-style: italic;
+}
+
+.metric-card-right {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 56px;
+  height: 56px;
+  margin-left: 12px;
+}
+
+.progress-ring-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+}
+
+/* Color variants based on value ranges */
+.metric-card-good {
+  border-left-color: #10b981;
+  background: linear-gradient(135deg, #1e2742 0%, rgba(16, 185, 129, 0.05) 100%);
+}
+
+.metric-card-good .metric-value {
+  color: #10b981;
+}
+
+.metric-card-warning {
+  border-left-color: #f59e0b;
+  background: linear-gradient(135deg, #1e2742 0%, rgba(245, 158, 11, 0.05) 100%);
+}
+
+.metric-card-warning .metric-value {
+  color: #fbbf24;
+}
+
+.metric-card-bad {
+  border-left-color: #ef4444;
+  background: linear-gradient(135deg, #1e2742 0%, rgba(239, 68, 68, 0.05) 100%);
+}
+
+.metric-card-bad .metric-value {
+  color: #f87171;
 }
 
 @media (max-width: 768px) {
+  .metric-card {
+    padding: 16px;
+  }
+
+  .metric-title {
+    font-size: 12px;
+  }
+
+  .metric-subtitle {
+    font-size: 11px;
+  }
+
   .metric-value {
     font-size: 24px;
+  }
+
+  .metric-helper {
+    font-size: 10px;
   }
 }

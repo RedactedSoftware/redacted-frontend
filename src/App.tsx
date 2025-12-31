@@ -5,7 +5,8 @@ import AuthForm from "./components/AuthForm";
 import { DeviceRegisterForm } from "./components/DeviceRegisterForm";
 import { MyDevicesList } from "./components/MyDevicesList";
 import Header from "./components/Header";
-import LegacyMetricCard from "./components/MetricCard";
+import LegacyMetricCard from "./components/MetricCard.jsx";
+import ProgressRing from "./components/ProgressRing";
 import CompassChart from "./components/CompassChart";
 import AccelerometerChart from "./components/AccelerometerChart";
 import GyroscopeChart from "./components/GyroscopeChart";
@@ -37,6 +38,27 @@ type Telemetry = {
   direction?: number | null;
   created_at: string | number;
   received_at: string | number;
+};
+
+type TrainingLiveResponse = {
+  device_id: string;
+  window_s: number;
+  sample_count: number;
+  orientation: null | {
+    pitch_deg: number | null;
+    roll_deg: number | null;
+    yaw_deg: number | null;
+  };
+  movement: null | {
+    stability_score: number;
+    micro_move_rate: number;
+    gyro_mean?: number;
+    gyro_std?: number;
+    drift_deg?: number;
+    drift_deg_per_s?: number;
+    drift_dir: "left" | "right" | "center" | "unknown";
+  };
+  note?: string;
 };
 
 const WS_URL = (process.env.NEXT_PUBLIC_WS_URL as string) || "";
@@ -72,7 +94,7 @@ function formatTimestamp(ts: number | string): string {
     }
     return trimmed;
   }
-  return "N/A";
+  return "--";
 }
 
 function formatNumber(value: unknown, digits = 2): string {
@@ -87,79 +109,66 @@ function formatNumber(value: unknown, digits = 2): string {
     }
   }
 
-  return "N/A";
+  return "--";
 }
 
-/**
- * Poll the PUBLIC history endpoint (no auth needed)
- * and convert the newest row into Telemetry.
- */
-async function fetchLatestTelemetry(): Promise<Telemetry | null> {
-  try {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      console.warn("No token found - skipping telemetry fetch");
-      return null;
-    }
+function fmtDeg(v: number | null | undefined) {
+  return typeof v === "number" && Number.isFinite(v) ? `${v.toFixed(2)}°` : "N/A";
+}
 
-    const res = await fetch(`${API_BASE}/api/telemetry/history`, {
-      cache: "no-store",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
+function fmtNum(v: number | null | undefined, digits = 2) {
+  return typeof v === "number" && Number.isFinite(v) ? v.toFixed(digits) : "N/A";
+}
 
-    if (!res.ok) {
-      console.warn(
-        "Failed to fetch latest telemetry:",
-        res.status,
-        res.statusText
-      );
-      return null;
-    }
+function getOrientationVariant(value: number | null | undefined): "good" | "warning" | "bad" | "default" {
+  if (value === null || value === undefined) return "default";
+  const abs = Math.abs(value);
+  if (abs <= 5) return "good";
+  if (abs <= 15) return "warning";
+  return "bad";
+}
 
-    const rows = (await res.json()) as any[];
-    if (!rows || rows.length === 0) return null;
+function getStabilityVariant(value: number | null | undefined): "good" | "warning" | "bad" | "default" {
+  if (value === null || value === undefined) return "default";
+  if (value >= 80) return "good";
+  if (value >= 50) return "warning";
+  return "bad";
+}
 
-    const row = rows[0];
+function getMicroMoveVariant(value: number | null | undefined): "good" | "warning" | "bad" | "default" {
+  if (value === null || value === undefined) return "default";
+  if (value <= 2) return "good";
+  if (value <= 5) return "warning";
+  return "bad";
+}
 
-    const msg: Telemetry = {
-      device_id: row.device_id,
-      device_ts: row.device_ts ?? row.created_at ?? 0,
-      heading_deg: row.heading_deg ?? 0,
-      temp: row.temp ?? null,
-      temperature: row.temperature ?? null,
-      battery_percent: row.battery_percent ?? null,
+function hasEnoughSamples(sampleCount: number | undefined): boolean {
+  return typeof sampleCount === "number" && sampleCount >= 10;
+}
 
-      accel_x: row.accel_x ?? null,
-      accel_y: row.accel_y ?? null,
-      accel_z: row.accel_z ?? null,
-
-      gyro_x: row.gyro_x ?? null,
-      gyro_y: row.gyro_y ?? null,
-      gyro_z: row.gyro_z ?? null,
-
-      mag_x: row.mag_x ?? null,
-      mag_y: row.mag_y ?? null,
-      mag_z: row.mag_z ?? null,
-
-      lat: row.latitude ?? row.lat ?? null,
-      lon: row.longitude ?? row.lon ?? null,
-      speed: row.speed_kmh ?? row.speed ?? null,
-      altitude: row.altitude_m ?? row.altitude ?? null,
-      pressure: row.pressure_hpa ?? row.pressure ?? null,
-      direction: row.direction_deg ?? row.heading_deg ?? null,
-
-      created_at: row.created_at ?? "",
-      received_at: row.received_at ?? "",
-    };
-
-    return msg;
-  } catch (err) {
-    console.error("Error in fetchLatestTelemetry:", err);
-    return null;
+function getCalibrationState(
+  sampleCount: number | undefined,
+  calibrationStartAt: number | null,
+  locked: boolean,
+  MIN_SAMPLES: number,
+  CALIBRATION_TIMEOUT_MS: number
+): {
+  isCalibrating: boolean;
+  isTimeoutFallback: boolean;
+  calibrationPercent: number;
+} {
+  const samples = sampleCount ?? 0;
+  const isCalibrating = !locked && samples < MIN_SAMPLES;
+  
+  if (!isCalibrating) {
+    return { isCalibrating: false, isTimeoutFallback: false, calibrationPercent: 100 };
   }
+
+  const elapsed = calibrationStartAt ? Date.now() - calibrationStartAt : 0;
+  const isTimeoutFallback = elapsed >= CALIBRATION_TIMEOUT_MS;
+  const calibrationPercent = Math.min(100, Math.round((samples / MIN_SAMPLES) * 100));
+
+  return { isCalibrating, isTimeoutFallback, calibrationPercent };
 }
 
 export default function Page() {
@@ -175,6 +184,19 @@ export default function Page() {
   const [selectedDevice, setSelectedDevice] = useState<string | "">("");
   const [resetPaused, setResetPaused] = useState(false);
   const lastWSUpdateRef = useRef<number>(0); // track last WebSocket update time
+
+  // Training live stats from WebSocket
+  const [trainingStats, setTrainingStats] = useState<TrainingLiveResponse | null>(null);
+  const [trainingErr, setTrainingErr] = useState<string | null>(null);
+
+  // Calibration state for tactical HUD
+  const calibrationStartAtRef = useRef<number | null>(null);
+  const lastDeviceIdRef = useRef<string | null>(null);
+  const [locked, setLocked] = useState(false);
+  const [recentlyLocked, setRecentlyLocked] = useState(false);
+
+  const MIN_SAMPLES = 6;
+  const CALIBRATION_TIMEOUT_MS = 12000;
 
   // read token from localStorage on mount
   useEffect(() => {
@@ -193,53 +215,20 @@ export default function Page() {
     );
   }, [darkMode]);
 
+  const resolvedDeviceId = useMemo(() => {
+    if (selectedDevice && selectedDevice.trim() !== "") {
+      return selectedDevice;
+    }
+    if (last?.device_id) {
+      return last.device_id;
+    }
+    return "";
+  }, [selectedDevice, last?.device_id]);
+
   const envMissing = !WS_URL || WS_URL.trim().length === 0;
   const secureWsUrl = useMemo(() => getSecureWebSocketUrl(WS_URL), []);
 
-  // periodic refresh from REST API - DISABLED when WebSocket is active
-  // The WebSocket provides real-time data, so REST polling would just overwrite with stale data
-  // Only use REST API if WebSocket never connects (fallback for connectivity issues)
-  useEffect(() => {
-    if (!token || resetPaused || connected) return; // skip if connected to WebSocket or not logged in
-
-    let cancelled = false;
-
-    const tick = async () => {
-      if (cancelled || connected) return; // re-check connection status
-      
-      const latest = await fetchLatestTelemetry();
-      if (!latest || cancelled) return;
-
-      console.log("REST API fallback poll updating with:", latest);
-      setLast(latest);
-      setHistory((prev) => {
-        const next = [latest, ...prev];
-
-        // de-dup by device_id + timestamp-ish
-        const seen = new Set<string>();
-        const deduped: Telemetry[] = [];
-        for (const row of next) {
-          const key = `${row.device_id}-${row.device_ts}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          deduped.push(row);
-          if (deduped.length >= MAX_HISTORY) break;
-        }
-        return deduped;
-      });
-    };
-
-    // initial fetch
-    tick();
-    const id = setInterval(tick, refreshSeconds * 1000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [token, refreshSeconds, resetPaused, connected]);
-
-  // WebSocket hookup (still used for real-time streaming)
+  // WebSocket hookup (real-time streaming)
   useEffect(() => {
     if (envMissing || !token || resetPaused) return;
 
@@ -272,9 +261,50 @@ export default function Page() {
         console.log("WS raw message:", e.data);
         const raw = JSON.parse(e.data);
         console.log("WS parsed:", raw);
+        
+        // ✅ Handle computed training stats pushed over WS
+        if (raw && raw.type === "training_live") {
+          // Optional: only accept if it matches current device
+          if (!raw.device_id || (resolvedDeviceId && raw.device_id !== resolvedDeviceId)) {
+            console.log("⏭️ Training stats for different device, skipping");
+            return;
+          }
+          console.log("📊 Training stats from WS:", raw);
+          
+          // ✅ Handle calibration state
+          const trainingData = raw as TrainingLiveResponse;
+          
+          // Reset calibration if device changed
+          if (lastDeviceIdRef.current !== trainingData.device_id) {
+            lastDeviceIdRef.current = trainingData.device_id;
+            calibrationStartAtRef.current = null;
+            setLocked(false);
+            setRecentlyLocked(false);
+          }
+          
+          // Start calibration timer on first message
+          if (!calibrationStartAtRef.current && trainingData.sample_count < MIN_SAMPLES) {
+            calibrationStartAtRef.current = Date.now();
+          }
+          
+          // Lock when we reach minimum samples
+          if (trainingData.sample_count >= MIN_SAMPLES && !locked) {
+            setLocked(true);
+            setRecentlyLocked(true);
+            // Clear the lock badge after 1.5s
+            setTimeout(() => setRecentlyLocked(false), 1500);
+          }
+          
+          setTrainingStats(trainingData);
+          setTrainingErr(null);
+          return;
+        }
+
         const payload =
           raw && raw.type === "telemetry" && raw.payload ? raw.payload : raw;
         console.log("WS payload:", payload);
+
+        
 
         const msg: Telemetry = {
           device_id: payload.device_id,
@@ -333,8 +363,17 @@ export default function Page() {
   }, [envMissing, secureWsUrl, token]);
 
   function handleReset() {
+    // Reset telemetry data
     setLast(null);
     setHistory([]);
+    
+    // Reset training data and calibration
+    setTrainingStats(null);
+    setTrainingErr(null);
+    setLocked(false);
+    setRecentlyLocked(false);
+    calibrationStartAtRef.current = null;
+    lastDeviceIdRef.current = null;
   }
  
 
@@ -376,7 +415,7 @@ export default function Page() {
   const locationLabel =
     last && last.lat != null && last.lon != null
       ? `${formatNumber(last.lat, 4)}, ${formatNumber(last.lon, 4)}`
-      : "N/A";
+      : "--";
 
   const directionDegValue =
     last && (last.direction != null || last.heading_deg != null)
@@ -386,21 +425,21 @@ export default function Page() {
   const directionDisplay =
     directionDegValue != null && Number.isFinite(directionDegValue)
       ? `${directionDegValue.toFixed(0)}`
-      : "N/A";
+      : "--";
 
   const metricSpeedDisplay =
-    speedKmh != null ? formatNumber(speedKmh, 1) : "N/A";
+    speedKmh != null ? formatNumber(speedKmh, 1) : "--";
   const imperialSpeedDisplay =
-    speedKmh != null ? formatNumber(speedKmh * 0.621371, 1) : "N/A";
+    speedKmh != null ? formatNumber(speedKmh * 0.621371, 1) : "--";
 
   const metricTempDisplay =
     temperatureC != null && Number.isFinite(temperatureC)
       ? temperatureC.toFixed(1)
-      : "N/A";
+      : "--";
   const imperialTempDisplay =
     temperatureC != null && Number.isFinite(temperatureC)
       ? ((temperatureC * 9) / 5 + 32).toFixed(1)
-      : "N/A";
+      : "--";
 
   const temperatureDisplay =
     metricUnit === "metric" ? metricTempDisplay : imperialTempDisplay;
@@ -408,8 +447,8 @@ export default function Page() {
   const speedDisplay =
     metricUnit === "metric" ? metricSpeedDisplay : imperialSpeedDisplay;
 
-  const altitudeDisplay = last ? formatNumber(last.altitude, 1) : "N/A";
-  const pressureDisplay = last ? formatNumber(last.pressure, 1) : "N/A";
+  const altitudeDisplay = last ? formatNumber(last.altitude, 1) : "--";
+  const pressureDisplay = last ? formatNumber(last.pressure, 1) : "--";
 
   // simple device list for header dropdown – keeps "My Devices" logic unchanged
   const headerDevices =
@@ -498,6 +537,100 @@ export default function Page() {
           />
         </section>
 
+        {/* Training live stats - fed from WebSocket with tactical HUD calibration */}
+        <section className="metrics-grid">
+          {(() => {
+            if (!trainingStats) {
+              return (
+                <>
+                  <LegacyMetricCard title="Forward / Backward Tilt" value="—" label="" />
+                  <LegacyMetricCard title="Left / Right Tilt" value="—" label="" />
+                  <LegacyMetricCard title="Rotational Twist" value="—" label="" />
+                  <LegacyMetricCard title="Overall Steadiness" value="—" label="" />
+                  <LegacyMetricCard title="Tiny Fidgets" value="—" label="" />
+                  <LegacyMetricCard title="Aim Drift Direction" value="—" label="" />
+                </>
+              );
+            }
+
+            const cal = getCalibrationState(
+              trainingStats.sample_count,
+              calibrationStartAtRef.current,
+              locked,
+              MIN_SAMPLES,
+              CALIBRATION_TIMEOUT_MS
+            );
+            const isCalibrating = cal.isCalibrating;
+            const isTimeoutFallback = cal.isTimeoutFallback;
+            
+            console.log("🎯 Training card render:", {
+              sample_count: trainingStats.sample_count,
+              locked,
+              isCalibrating,
+              calibrationPercent: cal.calibrationPercent
+            });
+
+            return (
+              <>
+                <LegacyMetricCard
+                  title="Forward / Backward Tilt"
+                  value={isCalibrating ? "—" : fmtDeg(trainingStats.orientation?.pitch_deg)}
+                  label={isCalibrating ? "" : "°"}
+                  subtitle={isCalibrating ? `CAL ${cal.calibrationPercent}%` : undefined}
+                  helperText={isCalibrating ? (isTimeoutFallback ? "Low data rate. Move to stabilize." : "Stabilizing sensors…") : "Keep your arm level. Close to 0° is best."}
+                  variant={isCalibrating ? "default" : getOrientationVariant(trainingStats.orientation?.pitch_deg)}
+                  rightSlot={<ProgressRing progress={cal.calibrationPercent / 100} visible={true} />}
+                />
+                <LegacyMetricCard
+                  title="Left / Right Tilt"
+                  value={isCalibrating ? "—" : fmtDeg(trainingStats.orientation?.roll_deg)}
+                  label={isCalibrating ? "" : "°"}
+                  subtitle={isCalibrating ? `CAL ${cal.calibrationPercent}%` : undefined}
+                  helperText={isCalibrating ? (isTimeoutFallback ? "Low data rate. Move to stabilize." : "Stabilizing sensors…") : "No sideways wrist rotation. Stay level."}
+                  variant={isCalibrating ? "default" : getOrientationVariant(trainingStats.orientation?.roll_deg)}
+                  rightSlot={<ProgressRing progress={cal.calibrationPercent / 100} visible={true} />}
+                />
+                <LegacyMetricCard
+                  title="Rotational Twist"
+                  value={isCalibrating ? "—" : fmtDeg(trainingStats.orientation?.yaw_deg)}
+                  label={isCalibrating ? "" : "°"}
+                  subtitle={isCalibrating ? `CAL ${cal.calibrationPercent}%` : undefined}
+                  helperText={isCalibrating ? (isTimeoutFallback ? "Low data rate. Move to stabilize." : "Stabilizing sensors…") : "Lock your aim direction. Stop twisting."}
+                  variant={isCalibrating ? "default" : getOrientationVariant(trainingStats.orientation?.yaw_deg)}
+                  rightSlot={<ProgressRing progress={cal.calibrationPercent / 100} visible={true} />}
+                />
+                <LegacyMetricCard
+                  title="Overall Steadiness"
+                  value={isCalibrating ? "—" : (recentlyLocked ? `${fmtNum(trainingStats.movement?.stability_score)} ✓` : fmtNum(trainingStats.movement?.stability_score))}
+                  label={isCalibrating ? "" : "/ 100"}
+                  subtitle={isCalibrating ? `CAL ${cal.calibrationPercent}%` : (recentlyLocked ? "LOCKED" : undefined)}
+                  helperText={isCalibrating ? (isTimeoutFallback ? "Low sample rate. Send more telemetry." : "Hold steady. Locking on.") : "Higher is better. Aim for 80+. Relax and breathe."}
+                  variant={isCalibrating ? "default" : (recentlyLocked ? "good" : getStabilityVariant(trainingStats.movement?.stability_score))}
+                  rightSlot={<ProgressRing progress={cal.calibrationPercent / 100} visible={true} />}
+                />
+                <LegacyMetricCard
+                  title="Tiny Fidgets"
+                  value={isCalibrating ? "—" : (recentlyLocked ? `${fmtNum(trainingStats.movement?.micro_move_rate)} ✓` : fmtNum(trainingStats.movement?.micro_move_rate))}
+                  label={isCalibrating ? "" : "/ sec"}
+                  subtitle={isCalibrating ? `CAL ${cal.calibrationPercent}%` : (recentlyLocked ? "LOCKED" : undefined)}
+                  helperText={isCalibrating ? (isTimeoutFallback ? "Low sample rate. Send more telemetry." : "Hold steady. Locking on.") : "Lower is better. Still your hands and focus."}
+                  variant={isCalibrating ? "default" : (recentlyLocked ? "good" : getMicroMoveVariant(trainingStats.movement?.micro_move_rate))}
+                  rightSlot={<ProgressRing progress={cal.calibrationPercent / 100} visible={true} />}
+                />
+                <LegacyMetricCard
+                  title="Aim Drift Direction"
+                  value={isCalibrating ? (isTimeoutFallback ? "LOW DATA" : "Calibrating…") : (trainingStats.movement?.drift_dir === "left" ? "Drifting Left" : trainingStats.movement?.drift_dir === "right" ? "Drifting Right" : trainingStats.movement?.drift_dir === "center" ? "Centered ✓" : "—")}
+                  label=""
+                  subtitle={isCalibrating ? `CAL ${cal.calibrationPercent}%` : (recentlyLocked ? "LOCKED" : undefined)}
+                  helperText={isCalibrating ? (isTimeoutFallback ? "Low sample rate. Send more telemetry." : "Hold steady. Locking on.") : (trainingStats.movement?.drift_dir === "center" ? "Perfect! Your grip is balanced." : trainingStats.movement?.drift_dir ? "Adjust your hand position to compensate." : "Analyzing your grip...")}
+                  variant={isCalibrating ? "default" : (recentlyLocked ? "good" : (trainingStats.movement?.drift_dir === "center" ? "good" : (trainingStats.movement?.drift_dir ? "warning" : "default")))}
+                  rightSlot={<ProgressRing progress={cal.calibrationPercent / 100} visible={true} />}
+                />
+              </>
+            );
+          })()}
+        </section>
+
         {/* IMU + satellite signal */}
         <section className="two-column-grid">
           <IMUChart data={[]} />
@@ -513,27 +646,27 @@ export default function Page() {
         {/* Connection + timestamps summary */}
         <section className="full-width">
           <div className="card">
-            <h2 className="card-title">Connection & Telemetry Summary</h2>
+            <h2 className="card-title">Status</h2>
             <div className="status-list">
               <div className="status-item">
-                <span className="status-label">WebSocket Status</span>
-                <span className="status-value">
-                  {connected ? "Connected" : "Disconnected"}
-                </span>
+                <div className="status-label">Connection:</div>
+                <div className="status-value">
+                  {connected ? "🟢 Online" : "🔴 Offline"}
+                </div>
               </div>
               <div className="status-item">
-                <span className="status-label">Device Timestamp</span>
-                <span className="status-value">{deviceTimestamp}</span>
+                <div className="status-label">Last Update:</div>
+                <div className="status-value">{deviceTimestamp}</div>
               </div>
               <div className="status-item">
-                <span className="status-label">Last Received</span>
-                <span className="status-value">{lastReceived}</span>
-              </div>
-              <div className="status-item">
-                <span className="status-label">Battery Level</span>
-                <span className="status-value">
+                <div className="status-label">Battery:</div>
+                <div className="status-value">
                   {last ? `${formatNumber(last.battery_percent, 0)}%` : "N/A"}
-                </span>
+                </div>
+              </div>
+              <div className="status-item">
+                <div className="status-label">Signal:</div>
+                <div className="status-value">{lastReceived}</div>
               </div>
             </div>
           </div>

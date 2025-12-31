@@ -1,7 +1,25 @@
 import React from 'react'
 import './MetricCard.css'
 
-function MetricCard({ title, value, label, subtitle, helperText, variant = 'default', rightSlot }) {
+interface MetricCardProps {
+  title: string
+  value: string | number
+  label?: string
+  subtitle?: string
+  helperText?: string
+  variant?: 'default' | 'good' | 'warning' | 'bad'
+  rightSlot?: React.ReactNode
+}
+
+function MetricCard({
+  title,
+  value,
+  label,
+  subtitle,
+  helperText,
+  variant = 'default',
+  rightSlot
+}: MetricCardProps) {
   return (
     <div className={`metric-card metric-card-${variant}`}>
       <div className="metric-card-header">
@@ -16,13 +34,6 @@ function MetricCard({ title, value, label, subtitle, helperText, variant = 'defa
       </div>
     </div>
   )
-}
-
-MetricCard.defaultProps = {
-  subtitle: null,
-  helperText: null,
-  variant: 'default',
-  rightSlot: null
 }
 
 export default MetricCard
