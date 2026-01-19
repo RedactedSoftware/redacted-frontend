@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import './mobile-improvements.css'
 import { ThemeProvider } from '../components/theme-provider'
 import MobileNav from '../components/MobileNav'
 import MobileLayoutWrapper from '../components/MobileLayoutWrapper'

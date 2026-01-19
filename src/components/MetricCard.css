@@ -75,6 +75,53 @@
   flex-shrink: 0;
 }
 
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  .metric-card {
+    border-radius: 10px;
+    padding: 14px 12px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  .metric-card-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .metric-title {
+    font-size: 12px;
+    margin-bottom: 2px;
+  }
+
+  .metric-value {
+    font-size: 24px;
+    margin-bottom: 2px;
+  }
+
+  .metric-label {
+    font-size: 11px;
+    margin-bottom: 4px;
+  }
+
+  .metric-helper {
+    font-size: 10px;
+    margin-top: 4px;
+  }
+
+  .metric-card-right {
+    min-width: 48px;
+    height: 48px;
+    margin-left: 0;
+    width: 100%;
+    margin-top: 8px;
+  }
+
+  .progress-ring-container {
+    width: 48px;
+    height: 48px;
+  }
+}
+
 /* Color variants based on value ranges */
 .metric-card-good {
   border-left-color: #10b981;
