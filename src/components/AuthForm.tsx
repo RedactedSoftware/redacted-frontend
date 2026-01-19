@@ -346,7 +346,7 @@ export default function AuthForm({ onAuth }: AuthFormProps) {
                 >
                   {isLogin ? (
                     <>
-                      Don't have access? <span className="text-cyan-400 font-semibold">Request Account</span>
+                      Don't have access? <span className="text-cyan-400 font-semibold">Create Account</span>
                     </>
                   ) : (
                     <>
