@@ -25,10 +25,11 @@ function api(url, init) {
 export async function fetchDeviceList() {
   const res = await api(`/devices`);
   if (!res.ok) {
-    throw new Error(`Failed to fetch devices: ${res.status} ${res.statusText}`);
+    const text = await res.text();
+    throw new Error(`Failed to fetch devices ${res.status}: ${text}`);
   }
-  const rows = await res.json(); // [{ device_id }]
-  return rows.map((r) => ({ id: r.device_id, name: r.device_id }));
+  const rows = await res.json(); // [{ device_id, name, registered_at }]
+  return rows.map((r) => ({ id: r.device_id, name: r.name ?? r.device_id, registered_at: r.registered_at }));
 }
 
 // Latest snapshot for cards (1 row → mapped to UI shape)

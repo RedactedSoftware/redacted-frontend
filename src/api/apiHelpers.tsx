@@ -80,20 +80,31 @@ export const fetchDeviceList = async () => {
   }
 
   try {
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("token") : null;
+
     const response = await fetch(`${API_BASE_URL}/api/devices`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     })
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+      const text = await response.text();
+      throw new Error(`Devices failed ${response.status}: ${text}`);
     }
 
-    const data = await response.json()
-    console.log('[v0] Fetched device list from API:', data)
-    return data
+    const raw = await response.json()
+    console.log('[v0] Fetched device list from API:', raw)
+    
+    // Map backend response (device_id) to UI expectation (id)
+    return raw.map((d: any) => ({
+      id: d.device_id,
+      name: d.name ?? d.device_id,
+      registered_at: d.registered_at,
+    }))
   } catch (error) {
     console.error('Error fetching device list:', error)
     // Fallback to mock data on error
