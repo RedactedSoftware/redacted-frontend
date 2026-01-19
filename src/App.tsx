@@ -380,9 +380,17 @@ export default function Page() {
           }
         );
 
+        if (!res.ok) {
+          const text = await res.text();
+          if (!cancelled) {
+            setTrainingErr(`HTTP ${res.status}: ${text.slice(0, 100)}`);
+          }
+          return;
+        }
+
         const data = await res.json();
 
-        if (!cancelled && res.ok) {
+        if (!cancelled) {
           console.log("📊 Training stats from REST poll:", data);
           setTrainingStats(data);
           // Only update lastGoodTrainingStats when sample_count >= MIN_SAMPLES
@@ -390,8 +398,6 @@ export default function Page() {
             setLastGoodTrainingStats(data);
           }
           setTrainingErr(null);
-        } else if (!cancelled) {
-          setTrainingErr(data?.error || "training/live failed");
         }
       } catch (e) {
         if (!cancelled) {

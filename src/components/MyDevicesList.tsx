@@ -38,8 +38,8 @@ export function MyDevicesList({ token }: MyDevicesListProps) {
       });
 
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error((data as any).error || "Failed to load devices");
+        const text = await res.text();
+        throw new Error(`Failed to load devices (${res.status}): ${text.slice(0, 200)}`);
       }
 
       const json = (await res.json()) as Device[];

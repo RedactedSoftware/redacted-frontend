@@ -23,7 +23,8 @@ export type TelemetryHistoryItem = {
 export async function fetchTelemetryHistory(): Promise<TelemetryHistoryItem[]> {
   const res = await fetch(`${API_BASE}/api/telemetry/history`);
   if (!res.ok) {
-    throw new Error("Failed to fetch history");
+    const text = await res.text();
+    throw new Error(`Failed to fetch history (${res.status}): ${text.slice(0, 200)}`);
   }
   const data = await res.json();
   // clean up numeric strings

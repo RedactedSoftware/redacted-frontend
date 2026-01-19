@@ -81,7 +81,8 @@ export default function HistoryPage() {
           if (response.status === 401) {
             throw new Error("Unauthorized - please log in");
           }
-          throw new Error(`HTTP ${response.status}`);
+          const text = await response.text();
+          throw new Error(`HTTP ${response.status}: ${text.slice(0, 200)}`);
         }
 
         const data: Session[] = await response.json();

@@ -40,8 +40,8 @@ export function DeviceRegisterForm({ token }: DeviceRegisterFormProps) {
       });
 
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error((data as any).error || "Failed to register device");
+        const text = await res.text();
+        throw new Error(`Failed to register device (${res.status}): ${text.slice(0, 200)}`);
       }
 
       setMessage("Device registered successfully ✅");
