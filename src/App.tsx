@@ -62,14 +62,15 @@ type TrainingLiveResponse = {
   note?: string;
 };
 
-import { WS_BASE } from "./api/constants";
+import { API_BASE, WS_BASE } from "./api/constants";
 
 const WS_URL = WS_BASE;
 const MAX_HISTORY = 25;
 
 // Log env on startup
 if (typeof window !== "undefined") {
-  console.log("🔌 Env Check: NEXT_PUBLIC_WS_URL:", WS_URL);
+  console.log("� Env Check: NEXT_PUBLIC_API_URL:", API_BASE);
+  console.log("�🔌 Env Check: NEXT_PUBLIC_WS_URL:", WS_URL);
 }
 
 function getSecureWebSocketUrl(url: string): string {

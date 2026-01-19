@@ -7,14 +7,6 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: process.env.API_ORIGIN + '/api/:path*',
-      },
-    ];
-  },
   async headers() {
     return [
       {

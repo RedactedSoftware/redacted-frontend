@@ -25,6 +25,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  overflow-x: hidden; /* Prevent horizontal scroll on mobile */
 }
 
 #__next {
@@ -33,4 +34,10 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  overflow-x: hidden; /* Prevent horizontal scroll on mobile */
 }
+
+@media (max-width: 640px) {
+  body {
+    font-size: 14px;
+  }

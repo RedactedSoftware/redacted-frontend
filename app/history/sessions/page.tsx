@@ -23,10 +23,13 @@ export default function SessionsHistoryPage() {
           return;
         }
 
-        const API_BASE =
-          process.env.NEXT_PUBLIC_API_URL || "http://localhost:8082";
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL;
+        if (!API_BASE) {
+          setError("NEXT_PUBLIC_API_URL is not configured");
+          return;
+        }
 
-        const res = await fetch('/api/sessions/history', {
+        const res = await fetch(`${API_BASE}/api/sessions/history`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

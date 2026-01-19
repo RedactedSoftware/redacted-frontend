@@ -78,47 +78,48 @@
 /* Mobile optimizations */
 @media (max-width: 640px) {
   .metric-card {
-    border-radius: 10px;
-    padding: 14px 12px;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 10px 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
   }
 
   .metric-card-header {
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
   }
 
   .metric-title {
-    font-size: 12px;
+    font-size: 11px;
     margin-bottom: 2px;
+    letter-spacing: 0px;
   }
 
   .metric-value {
-    font-size: 24px;
+    font-size: 20px;
     margin-bottom: 2px;
   }
 
   .metric-label {
-    font-size: 11px;
+    font-size: 10px;
     margin-bottom: 4px;
   }
 
   .metric-helper {
-    font-size: 10px;
+    font-size: 9px;
     margin-top: 4px;
   }
 
   .metric-card-right {
-    min-width: 48px;
-    height: 48px;
+    min-width: 40px;
+    height: 40px;
     margin-left: 0;
     width: 100%;
-    margin-top: 8px;
+    margin-top: 6px;
   }
 
   .progress-ring-container {
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
   }
 }
 
