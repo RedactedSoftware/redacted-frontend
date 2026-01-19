@@ -13,6 +13,26 @@ type MyDevicesListProps = {
   token: string | null;
 };
 
+// Safe JSON parser that validates content-type first
+async function safeJson(res: Response) {
+  const ct = res.headers.get("content-type") || "";
+  const text = await res.text();
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+  }
+
+  if (!ct.includes("application/json")) {
+    throw new Error(`Expected JSON but got ${ct}. Body: ${text.slice(0, 200)}`);
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error(`Invalid JSON: ${text.slice(0, 100)}`);
+  }
+}
+
 export function MyDevicesList({ token }: MyDevicesListProps) {
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,19 +51,25 @@ export function MyDevicesList({ token }: MyDevicesListProps) {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/api/devices`, {
+      const url = `${API_BASE}/api/devices`;
+      console.log("📱 devices fetch:", url);
+
+      const res = await fetch(url, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Failed to load devices (${res.status}): ${text.slice(0, 200)}`);
-      }
-
-      const json = (await res.json()) as Device[];
-      setDevices(json);
+      const raw = await safeJson(res);
+      
+      // Map backend response (device_id) to UI expectation (id)
+      const mapped = raw.map((d: any) => ({
+        device_id: d.device_id,
+        name: d.name ?? d.device_id,
+        registered_at: d.registered_at,
+      }));
+      
+      setDevices(mapped);
     } catch (err: any) {
       setError(err.message || "Error loading devices");
     } finally {

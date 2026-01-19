@@ -1,35 +1,45 @@
 // src/api/apiHelpers.js
+import { API_BASE } from './constants';
 
-// Import API_BASE from constants
-// Note: For .js files, we'll use process.env directly since ES modules aren't available
-const BASE =
-  process.env.NEXT_PUBLIC_API_URL ||
-  process.env.NEXT_PUBLIC_API_BASE ||
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "";
+// Safe JSON parser that validates content-type first
+async function safeJson(res) {
+  const ct = res.headers.get("content-type") || "";
+  const text = await res.text();
 
-// Generic helper to call the backend
-function api(url, init) {
-  const full = `${BASE}${url}`;
-  return fetch(full, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
-    cache: "no-store",
-  });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+  }
+
+  if (!ct.includes("application/json")) {
+    throw new Error(`Expected JSON but got ${ct}. Body: ${text.slice(0, 200)}`);
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error(`Invalid JSON: ${text.slice(0, 100)}`);
+  }
 }
 
-// Devices list → normalize to { id, name }
+// Devices list → token gated, bulletproof
 export async function fetchDeviceList() {
-  const res = await api(`/devices`);
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Failed to fetch devices ${res.status}: ${text}`);
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  if (!token) {
+    console.warn("❌ fetchDeviceList: No token available");
+    return [];
   }
-  const rows = await res.json(); // [{ device_id, name, registered_at }]
-  return rows.map((r) => ({ id: r.device_id, name: r.name ?? r.device_id, registered_at: r.registered_at }));
+
+  const url = `${API_BASE}/api/devices`;
+  console.log("📱 devices fetch:", url);
+
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await safeJson(res);
+  return data.map((r) => ({ id: r.device_id, name: r.name ?? r.device_id, registered_at: r.registered_at }));
 }
 
 // Latest snapshot for cards (1 row → mapped to UI shape)
