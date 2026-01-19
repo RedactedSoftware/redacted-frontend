@@ -20,13 +20,33 @@ export type TelemetryHistoryItem = {
   received_at: string | null;
 };
 
-export async function fetchTelemetryHistory(): Promise<TelemetryHistoryItem[]> {
-  const res = await fetch(`${API_BASE}/api/telemetry/history`);
+// Safe JSON parser
+async function safeJson(res: Response) {
+  const ct = res.headers.get("content-type") || "";
+  const text = await res.text();
+
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Failed to fetch history (${res.status}): ${text.slice(0, 200)}`);
+    throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
   }
-  const data = await res.json();
+
+  if (!ct.includes("application/json")) {
+    throw new Error(`Expected JSON but got ${ct}. Body: ${text.slice(0, 200)}`);
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error(`Invalid JSON: ${text.slice(0, 100)}`);
+  }
+}
+
+export async function fetchTelemetryHistory(): Promise<TelemetryHistoryItem[]> {
+  const url = `${API_BASE}/api/telemetry/history`;
+  console.log("📊 telemetry history fetch:", url);
+
+  const res = await fetch(url);
+  const data = await safeJson(res);
+
   // clean up numeric strings
   return data.map((row: any) => ({
     uid: row.uid,

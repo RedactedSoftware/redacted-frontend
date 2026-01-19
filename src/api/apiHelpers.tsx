@@ -55,15 +55,3 @@ export const fetchDeviceList = async () => {
     throw error;
   }
 };
-    }
-
-    const data = await response.json()
-    console.log('[v0] Fetched device data from API:', data)
-    return data
-  } catch (error) {
-    console.error('Error fetching device data:', error)
-    // Fallback to mock data on error
-    console.log('[v0] Falling back to mock device data')
-    return generateMockDeviceData()
-  }
-}
