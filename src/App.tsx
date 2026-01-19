@@ -8,6 +8,7 @@ import Header from "./components/Header";
 import LegacyMetricCard from "./components/MetricCard.jsx";
 import ProgressRing from "./components/ProgressRing";
 import CompassChart from "./components/CompassChart";
+import MagnetometerCompass from "./components/MagnetometerCompass";
 import AccelerometerChart from "./components/AccelerometerChart";
 import GyroscopeChart from "./components/GyroscopeChart";
 import SatelliteChart from "./components/SatelliteChart";
@@ -18,7 +19,7 @@ type Telemetry = {
   device_id: string;
   device_ts: number | string;
   heading_deg: number;
-  temp: number | null;
+  temp_c: number | null;
   temperature?: number | null;
   battery_percent: number | null;
   accel_x: number | null;
@@ -187,6 +188,7 @@ export default function Page() {
 
   // Training live stats from WebSocket
   const [trainingStats, setTrainingStats] = useState<TrainingLiveResponse | null>(null);
+  const [lastGoodTrainingStats, setLastGoodTrainingStats] = useState<TrainingLiveResponse | null>(null);
   const [trainingErr, setTrainingErr] = useState<string | null>(null);
 
   // Calibration state for tactical HUD
@@ -264,12 +266,8 @@ export default function Page() {
         
         // ✅ Handle computed training stats pushed over WS
         if (raw && raw.type === "training_live") {
-          // Optional: only accept if it matches current device
-          if (!raw.device_id || (resolvedDeviceId && raw.device_id !== resolvedDeviceId)) {
-            console.log("⏭️ Training stats for different device, skipping");
-            return;
-          }
-          console.log("📊 Training stats from WS:", raw);
+          // Accept training stats (device filtering will happen when user selects device)
+          console.log("📊 Training stats from WS:", raw, "device_id:", raw.device_id, "sample_count:", raw.sample_count, "orientation:", raw.orientation, "movement:", raw.movement);
           
           // ✅ Handle calibration state
           const trainingData = raw as TrainingLiveResponse;
@@ -296,6 +294,10 @@ export default function Page() {
           }
           
           setTrainingStats(trainingData);
+          // Only update lastGoodTrainingStats when sample_count >= MIN_SAMPLES
+          if (trainingData.sample_count >= MIN_SAMPLES && trainingData.orientation && trainingData.movement) {
+            setLastGoodTrainingStats(trainingData);
+          }
           setTrainingErr(null);
           return;
         }
@@ -310,7 +312,7 @@ export default function Page() {
           device_id: payload.device_id,
           device_ts: payload.device_ts ?? payload.timestamp ?? 0,
           heading_deg: payload.heading_deg ?? payload.heading ?? 0,
-          temp: payload.temp ?? null,
+          temp_c: payload.temp_c ?? payload.temp ?? null,
           temperature: payload.temperature ?? null,
           battery_percent: payload.battery_percent ?? null,
           accel_x: payload.accel_x ?? payload.accelerometer?.x ?? null,
@@ -362,6 +364,52 @@ export default function Page() {
     };
   }, [envMissing, secureWsUrl, token]);
 
+  // Poll training stats from REST API as fallback
+  useEffect(() => {
+    if (!token || !resolvedDeviceId) return;
+
+    const id = resolvedDeviceId.toLowerCase(); // DB uses lowercase
+    let cancelled = false;
+
+    async function tick() {
+      try {
+        const res = await fetch(
+          `${API_BASE}/api/training/live?device_id=${encodeURIComponent(id)}&window=120`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        const data = await res.json();
+
+        if (!cancelled && res.ok) {
+          console.log("📊 Training stats from REST poll:", data);
+          setTrainingStats(data);
+          // Only update lastGoodTrainingStats when sample_count >= MIN_SAMPLES
+          if (data?.sample_count >= MIN_SAMPLES && data?.orientation && data?.movement) {
+            setLastGoodTrainingStats(data);
+          }
+          setTrainingErr(null);
+        } else if (!cancelled) {
+          setTrainingErr(data?.error || "training/live failed");
+        }
+      } catch (e) {
+        if (!cancelled) {
+          console.error("training/live fetch failed:", e);
+          setTrainingErr("training/live fetch failed");
+        }
+      }
+    }
+
+    tick();
+    const t = setInterval(tick, 1000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [token, resolvedDeviceId]);
+
   function handleReset() {
     // Reset telemetry data
     setLast(null);
@@ -369,6 +417,7 @@ export default function Page() {
     
     // Reset training data and calibration
     setTrainingStats(null);
+    setLastGoodTrainingStats(null);
     setTrainingErr(null);
     setLocked(false);
     setRecentlyLocked(false);
@@ -408,8 +457,8 @@ export default function Page() {
       : null;
 
   const temperatureC =
-    last && (last.temp != null || last.temperature != null)
-      ? Number(formatNumber(last.temp ?? last.temperature, 1))
+    last && (last.temp_c != null || last.temperature != null)
+      ? Number(formatNumber(last.temp_c ?? last.temperature, 1))
       : null;
 
   const locationLabel =
@@ -540,7 +589,15 @@ export default function Page() {
         {/* Training live stats - fed from WebSocket with tactical HUD calibration */}
         <section className="metrics-grid">
           {(() => {
-            if (!trainingStats) {
+            // Use trainingStats if good enough, otherwise fall back to lastGoodTrainingStats
+            const displayStats = 
+              trainingStats && trainingStats.sample_count >= MIN_SAMPLES && 
+              trainingStats.orientation && 
+              trainingStats.movement
+                ? trainingStats 
+                : lastGoodTrainingStats;
+            
+            if (!displayStats) {
               return (
                 <>
                   <LegacyMetricCard title="Forward / Backward Tilt" value="—" label="" />
@@ -554,7 +611,7 @@ export default function Page() {
             }
 
             const cal = getCalibrationState(
-              trainingStats.sample_count,
+              trainingStats?.sample_count ?? displayStats.sample_count,
               calibrationStartAtRef.current,
               locked,
               MIN_SAMPLES,
@@ -564,66 +621,67 @@ export default function Page() {
             const isTimeoutFallback = cal.isTimeoutFallback;
             
             console.log("🎯 Training card render:", {
-              sample_count: trainingStats.sample_count,
+              sample_count: trainingStats?.sample_count ?? displayStats.sample_count,
               locked,
               isCalibrating,
-              calibrationPercent: cal.calibrationPercent
+              calibrationPercent: cal.calibrationPercent,
+              usingFallback: trainingStats !== displayStats
             });
 
             return (
               <>
                 <LegacyMetricCard
                   title="Forward / Backward Tilt"
-                  value={isCalibrating ? "—" : fmtDeg(trainingStats.orientation?.pitch_deg)}
+                  value={isCalibrating ? "—" : fmtDeg(displayStats.orientation?.pitch_deg)}
                   label={isCalibrating ? "" : "°"}
                   subtitle={isCalibrating ? `CAL ${cal.calibrationPercent}%` : undefined}
                   helperText={isCalibrating ? (isTimeoutFallback ? "Low data rate. Move to stabilize." : "Stabilizing sensors…") : "Keep your arm level. Close to 0° is best."}
-                  variant={isCalibrating ? "default" : getOrientationVariant(trainingStats.orientation?.pitch_deg)}
+                  variant={isCalibrating ? "default" : getOrientationVariant(displayStats.orientation?.pitch_deg)}
                   rightSlot={<ProgressRing progress={cal.calibrationPercent / 100} visible={true} />}
                 />
                 <LegacyMetricCard
                   title="Left / Right Tilt"
-                  value={isCalibrating ? "—" : fmtDeg(trainingStats.orientation?.roll_deg)}
+                  value={isCalibrating ? "—" : fmtDeg(displayStats.orientation?.roll_deg)}
                   label={isCalibrating ? "" : "°"}
                   subtitle={isCalibrating ? `CAL ${cal.calibrationPercent}%` : undefined}
                   helperText={isCalibrating ? (isTimeoutFallback ? "Low data rate. Move to stabilize." : "Stabilizing sensors…") : "No sideways wrist rotation. Stay level."}
-                  variant={isCalibrating ? "default" : getOrientationVariant(trainingStats.orientation?.roll_deg)}
+                  variant={isCalibrating ? "default" : getOrientationVariant(displayStats.orientation?.roll_deg)}
                   rightSlot={<ProgressRing progress={cal.calibrationPercent / 100} visible={true} />}
                 />
                 <LegacyMetricCard
                   title="Rotational Twist"
-                  value={isCalibrating ? "—" : fmtDeg(trainingStats.orientation?.yaw_deg)}
+                  value={isCalibrating ? "—" : fmtDeg(displayStats.orientation?.yaw_deg)}
                   label={isCalibrating ? "" : "°"}
                   subtitle={isCalibrating ? `CAL ${cal.calibrationPercent}%` : undefined}
                   helperText={isCalibrating ? (isTimeoutFallback ? "Low data rate. Move to stabilize." : "Stabilizing sensors…") : "Lock your aim direction. Stop twisting."}
-                  variant={isCalibrating ? "default" : getOrientationVariant(trainingStats.orientation?.yaw_deg)}
+                  variant={isCalibrating ? "default" : getOrientationVariant(displayStats.orientation?.yaw_deg)}
                   rightSlot={<ProgressRing progress={cal.calibrationPercent / 100} visible={true} />}
                 />
                 <LegacyMetricCard
                   title="Overall Steadiness"
-                  value={isCalibrating ? "—" : (recentlyLocked ? `${fmtNum(trainingStats.movement?.stability_score)} ✓` : fmtNum(trainingStats.movement?.stability_score))}
+                  value={isCalibrating ? "—" : (recentlyLocked ? `${fmtNum(displayStats.movement?.stability_score)} ✓` : fmtNum(displayStats.movement?.stability_score))}
                   label={isCalibrating ? "" : "/ 100"}
                   subtitle={isCalibrating ? `CAL ${cal.calibrationPercent}%` : (recentlyLocked ? "LOCKED" : undefined)}
                   helperText={isCalibrating ? (isTimeoutFallback ? "Low sample rate. Send more telemetry." : "Hold steady. Locking on.") : "Higher is better. Aim for 80+. Relax and breathe."}
-                  variant={isCalibrating ? "default" : (recentlyLocked ? "good" : getStabilityVariant(trainingStats.movement?.stability_score))}
+                  variant={isCalibrating ? "default" : (recentlyLocked ? "good" : getStabilityVariant(displayStats.movement?.stability_score))}
                   rightSlot={<ProgressRing progress={cal.calibrationPercent / 100} visible={true} />}
                 />
                 <LegacyMetricCard
                   title="Tiny Fidgets"
-                  value={isCalibrating ? "—" : (recentlyLocked ? `${fmtNum(trainingStats.movement?.micro_move_rate)} ✓` : fmtNum(trainingStats.movement?.micro_move_rate))}
+                  value={isCalibrating ? "—" : (recentlyLocked ? `${fmtNum(displayStats.movement?.micro_move_rate)} ✓` : fmtNum(displayStats.movement?.micro_move_rate))}
                   label={isCalibrating ? "" : "/ sec"}
                   subtitle={isCalibrating ? `CAL ${cal.calibrationPercent}%` : (recentlyLocked ? "LOCKED" : undefined)}
                   helperText={isCalibrating ? (isTimeoutFallback ? "Low sample rate. Send more telemetry." : "Hold steady. Locking on.") : "Lower is better. Still your hands and focus."}
-                  variant={isCalibrating ? "default" : (recentlyLocked ? "good" : getMicroMoveVariant(trainingStats.movement?.micro_move_rate))}
+                  variant={isCalibrating ? "default" : (recentlyLocked ? "good" : getMicroMoveVariant(displayStats.movement?.micro_move_rate))}
                   rightSlot={<ProgressRing progress={cal.calibrationPercent / 100} visible={true} />}
                 />
                 <LegacyMetricCard
                   title="Aim Drift Direction"
-                  value={isCalibrating ? (isTimeoutFallback ? "LOW DATA" : "Calibrating…") : (trainingStats.movement?.drift_dir === "left" ? "Drifting Left" : trainingStats.movement?.drift_dir === "right" ? "Drifting Right" : trainingStats.movement?.drift_dir === "center" ? "Centered ✓" : "—")}
+                  value={isCalibrating ? (isTimeoutFallback ? "LOW DATA" : "Calibrating…") : (displayStats.movement?.drift_dir === "left" ? "Drifting Left" : displayStats.movement?.drift_dir === "right" ? "Drifting Right" : displayStats.movement?.drift_dir === "center" ? "Centered ✓" : "—")}
                   label=""
                   subtitle={isCalibrating ? `CAL ${cal.calibrationPercent}%` : (recentlyLocked ? "LOCKED" : undefined)}
-                  helperText={isCalibrating ? (isTimeoutFallback ? "Low sample rate. Send more telemetry." : "Hold steady. Locking on.") : (trainingStats.movement?.drift_dir === "center" ? "Perfect! Your grip is balanced." : trainingStats.movement?.drift_dir ? "Adjust your hand position to compensate." : "Analyzing your grip...")}
-                  variant={isCalibrating ? "default" : (recentlyLocked ? "good" : (trainingStats.movement?.drift_dir === "center" ? "good" : (trainingStats.movement?.drift_dir ? "warning" : "default")))}
+                  helperText={isCalibrating ? (isTimeoutFallback ? "Low sample rate. Send more telemetry." : "Hold steady. Locking on.") : (displayStats.movement?.drift_dir === "center" ? "Perfect! Your grip is balanced." : displayStats.movement?.drift_dir ? "Adjust your hand position to compensate." : "Analyzing your grip...")}
+                  variant={isCalibrating ? "default" : (recentlyLocked ? "good" : (displayStats.movement?.drift_dir === "center" ? "good" : (displayStats.movement?.drift_dir ? "warning" : "default")))}
                   rightSlot={<ProgressRing progress={cal.calibrationPercent / 100} visible={true} />}
                 />
               </>
@@ -635,6 +693,15 @@ export default function Page() {
         <section className="two-column-grid">
           <IMUChart data={[]} />
           <SatelliteChart data={[]} />
+        </section>
+
+        {/* Magnetometer Compass */}
+        <section className="full-width">
+          <MagnetometerCompass
+            mag_x={last?.mag_x ?? null}
+            mag_y={last?.mag_y ?? null}
+            mag_z={last?.mag_z ?? null}
+          />
         </section>
 
         {/* Motion sensor charts */}
