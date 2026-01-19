@@ -1,4 +1,5 @@
 // src/realtime/wsClient.js
+// Uses NEXT_PUBLIC_WS_URL for WebSocket connections (not API requests)
 let socket = null;
 let listeners = new Set();
 let stopped = false;

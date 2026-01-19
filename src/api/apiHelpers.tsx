@@ -1,6 +1,8 @@
 // API Configuration
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://YOUR_EC2_IP_HERE:8000'
-const USE_MOCK_DATA = !process.env.NEXT_PUBLIC_API_URL // Use mock data if no API URL is configured
+import { API_BASE } from './constants';
+
+const API_BASE_URL = API_BASE || 'http://YOUR_EC2_IP_HERE:8000'
+const USE_MOCK_DATA = !API_BASE // Use mock data if no API URL is configured
 
 // Mock data generator for demo purposes
 const generateMockDeviceData = () => {

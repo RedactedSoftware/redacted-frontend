@@ -1,6 +1,8 @@
 
 
 // frontend/api/fetchTelemetryHistory.ts
+import { API_BASE } from './constants';
+
 export type TelemetryHistoryItem = {
   uid: string;
   device_id: string;
@@ -17,8 +19,6 @@ export type TelemetryHistoryItem = {
   created_at: string;
   received_at: string | null;
 };
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8082";
 
 export async function fetchTelemetryHistory(): Promise<TelemetryHistoryItem[]> {
   const res = await fetch(`${API_BASE}/api/telemetry/history`);

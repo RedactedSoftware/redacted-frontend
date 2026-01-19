@@ -1,5 +1,7 @@
 // src/api/apiHelpers.js
 
+// Import API_BASE from constants
+// Note: For .js files, we'll use process.env directly since ES modules aren't available
 const BASE =
   process.env.NEXT_PUBLIC_API_URL ||
   process.env.NEXT_PUBLIC_API_BASE ||

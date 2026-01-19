@@ -62,10 +62,10 @@ type TrainingLiveResponse = {
   note?: string;
 };
 
-const WS_URL = (process.env.NEXT_PUBLIC_WS_URL as string) || "";
+import { API_BASE, WS_BASE } from "./api/constants";
+
+const WS_URL = WS_BASE;
 const MAX_HISTORY = 25;
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8082"; // fallback for local
 
 // Log env on startup
 if (typeof window !== "undefined") {

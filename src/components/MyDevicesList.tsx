@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8082";
+import { API_BASE } from "@/api/constants";
 
 type Device = {
   device_id: string;
