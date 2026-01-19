@@ -12,10 +12,10 @@ export default function MobileLayoutWrapper({ children }: { children: React.Reac
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Mobile layout - full screen, optimized for touch
+  // Mobile layout - full screen flex, optimized for touch
   if (isMobile) {
     return (
-      <div className="mobile-layout h-screen w-screen flex flex-col bg-[#0f1729]">
+      <div className="mobile-layout w-screen h-screen flex flex-col bg-[#0f1729] overflow-hidden">
         {children}
       </div>
     );

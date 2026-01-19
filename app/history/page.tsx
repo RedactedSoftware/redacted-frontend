@@ -89,7 +89,20 @@ export default function HistoryPage() {
           throw new Error(`HTTP ${response.status}: ${text.slice(0, 200)}`);
         }
 
-        const data: Session[] = await response.json();
+        // Read text first to validate content-type before JSON parsing
+        const text = await response.text();
+        const ct = response.headers.get("content-type") || "";
+        
+        if (!ct.includes("application/json")) {
+          throw new Error(`Expected JSON but got ${ct}`);
+        }
+
+        let data: Session[];
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          throw new Error(`Invalid JSON response: ${e}`);
+        }
 
         if (!cancelled) {
           setSessions(data || []);

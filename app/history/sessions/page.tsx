@@ -37,7 +37,20 @@ export default function SessionsHistoryPage() {
           throw new Error(`API error ${res.status}: ${text}`);
         }
 
-        const data = (await res.json()) as SessionRow[];
+        // Read text first to validate content-type before JSON parsing
+        const text = await res.text();
+        const ct = res.headers.get("content-type") || "";
+        
+        if (!ct.includes("application/json")) {
+          throw new Error(`Expected JSON but got ${ct}`);
+        }
+
+        let data: SessionRow[];
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          throw new Error(`Invalid JSON response: ${e}`);
+        }
         setSessions(data);
       } catch (e: any) {
         setError(e.message || "Failed to load sessions");

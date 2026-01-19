@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+html {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -14,5 +20,17 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background: #0f1629;
   color: #ffffff;
-  min-height: 100vh;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#__next {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }

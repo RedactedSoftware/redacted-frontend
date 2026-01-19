@@ -388,7 +388,26 @@ export default function Page() {
           return;
         }
 
-        const data = await res.json();
+        // Read text first to validate content-type before JSON parsing
+        const text = await res.text();
+        const ct = res.headers.get("content-type") || "";
+        
+        if (!ct.includes("application/json")) {
+          if (!cancelled) {
+            setTrainingErr(`Expected JSON but got ${ct}`);
+          }
+          return;
+        }
+
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          if (!cancelled) {
+            setTrainingErr(`Invalid JSON response: ${e}`);
+          }
+          return;
+        }
 
         if (!cancelled) {
           console.log("📊 Training stats from REST poll:", data);

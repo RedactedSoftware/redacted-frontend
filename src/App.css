@@ -1,7 +1,11 @@
 .app {
-  min-height: 100vh;
+  height: 100%;
+  width: 100%;
   background: #0f1629;
   color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .app.light {
@@ -13,6 +17,25 @@
   max-width: 1600px;
   margin: 0 auto;
   padding: 20px;
+  width: 100%;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile optimization */
+@media (max-width: 768px) {
+  .dashboard {
+    padding: 12px;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard {
+    padding: 8px;
+  }
 }
 
 .metrics-grid {
@@ -22,6 +45,15 @@
   margin-bottom: 20px;
 }
 
+/* Mobile: Single column for metrics */
+@media (max-width: 640px) {
+  .metrics-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+}
+
 .two-column-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
@@ -29,8 +61,22 @@
   margin-bottom: 20px;
 }
 
+/* Mobile: Stack columns on small screens */
+@media (max-width: 768px) {
+  .two-column-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
 .full-width {
   margin-bottom: 20px;
+}
+
+@media (max-width: 640px) {
+  .full-width {
+    margin-bottom: 16px;
+  }
 }
 
 .card {
@@ -38,6 +84,14 @@
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 640px) {
+  .card {
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  }
 }
 
 .app.light .card {

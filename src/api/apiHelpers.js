@@ -46,16 +46,17 @@ export async function fetchDeviceList() {
 export async function fetchDeviceData(deviceId) {
   if (!deviceId) throw new Error("Missing deviceId");
 
-  const res = await api(
-    `/telemetry?device_id=${encodeURIComponent(deviceId)}&limit=1`
-  );
-  if (!res.ok) {
-    throw new Error(
-      `Failed to fetch device data: ${res.status} ${res.statusText}`
-    );
-  }
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  if (!token) throw new Error("No authentication token");
 
-  const arr = await res.json();
+  const url = `${API_BASE}/api/telemetry?device_id=${encodeURIComponent(deviceId)}&limit=1`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const arr = await safeJson(res);
   const r = arr[0] || {};
 
   return {
@@ -94,16 +95,17 @@ export async function fetchDeviceData(deviceId) {
 export async function fetchDeviceSeries(deviceId, limit = 200) {
   if (!deviceId) throw new Error("Missing deviceId");
 
-  const res = await api(
-    `/telemetry?device_id=${encodeURIComponent(deviceId)}&limit=${limit}`
-  );
-  if (!res.ok) {
-    throw new Error(
-      `Failed to fetch device series: ${res.status} ${res.statusText}`
-    );
-  }
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  if (!token) throw new Error("No authentication token");
 
-  const arr = await res.json();
+  const url = `${API_BASE}/api/telemetry?device_id=${encodeURIComponent(deviceId)}&limit=${limit}`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const arr = await safeJson(res);
   return arr
     .map((r) => ({
       time: r.ts ? new Date(r.ts).toLocaleTimeString() : "",
@@ -118,16 +120,17 @@ export async function fetchDeviceSeries(deviceId, limit = 200) {
 export async function fetchGyroSeries(deviceId, limit = 200) {
   if (!deviceId) throw new Error("Missing deviceId");
 
-  const res = await api(
-    `/telemetry?device_id=${encodeURIComponent(deviceId)}&limit=${limit}`
-  );
-  if (!res.ok) {
-    throw new Error(
-      `Failed to fetch gyro series: ${res.status} ${res.statusText}`
-    );
-  }
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  if (!token) throw new Error("No authentication token");
 
-  const arr = await res.json();
+  const url = `${API_BASE}/api/telemetry?device_id=${encodeURIComponent(deviceId)}&limit=${limit}`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const arr = await safeJson(res);
   return arr
     .map((r) => ({
       time: r.ts ? new Date(r.ts).toLocaleTimeString() : "",
@@ -142,18 +145,13 @@ export async function fetchGyroSeries(deviceId, limit = 200) {
 export async function fetchMyTelemetry(token) {
   if (!token) throw new Error("Missing auth token");
 
-  const res = await api("/api/telemetry/my", {
+  const url = `${API_BASE}/api/telemetry/my`;
+  const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
   });
 
-  if (!res.ok) {
-    throw new Error(
-      `Failed to fetch my telemetry: ${res.status} ${res.statusText}`
-    );
-  }
-
-  const rows = await res.json(); // array of telemetry rows
+  const rows = await safeJson(res); // array of telemetry rows
   return rows;
 }

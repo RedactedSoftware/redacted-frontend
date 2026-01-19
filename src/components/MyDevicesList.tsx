@@ -120,7 +120,20 @@ export function MyDevicesList({ token }: MyDevicesListProps) {
         throw new Error(errorMsg);
       }
 
-      const data = await res.json();
+      // Read text first to validate before parsing JSON
+      const text = await res.text();
+      const ct = res.headers.get("content-type") || "";
+      
+      if (!ct.includes("application/json")) {
+        throw new Error(`Expected JSON but got ${ct}. Response: ${text.slice(0, 100)}`);
+      }
+
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Invalid JSON response: ${e}. Body: ${text.slice(0, 100)}`);
+      }
       console.log("✅ Delete successful:", data);
 
       // Remove device from list

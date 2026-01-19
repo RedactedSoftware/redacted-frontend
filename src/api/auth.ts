@@ -5,6 +5,26 @@ type AuthResponse = {
   token: string;
 };
 
+// Safe JSON helper
+async function safeJson(res: Response) {
+  const ct = res.headers.get("content-type") || "";
+  const text = await res.text();
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+  }
+
+  if (!ct.includes("application/json")) {
+    throw new Error(`Expected JSON but got ${ct}. Body: ${text.slice(0, 200)}`);
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error(`Invalid JSON: ${text.slice(0, 100)}`);
+  }
+}
+
 export async function signup(email: string, password: string): Promise<string> {
   try {
     console.log('📤 Signup attempt to:', `${API_BASE}/api/signup`);
@@ -15,13 +35,7 @@ export async function signup(email: string, password: string): Promise<string> {
     });
 
     console.log('📬 Signup response status:', res.status);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      console.error('❌ Signup error response:', data);
-      throw new Error(data.error || `Signup failed: ${res.status} ${res.statusText}`);
-    }
-
-    const data = (await res.json()) as AuthResponse;
+    const data = (await safeJson(res)) as AuthResponse;
     console.log('✅ Signup successful');
     
     // Save token to localStorage
@@ -47,13 +61,7 @@ export async function login(email: string, password: string): Promise<string> {
     });
 
     console.log('📬 Login response status:', res.status);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      console.error('❌ Login error response:', data);
-      throw new Error(data.error || `Login failed: ${res.status} ${res.statusText}`);
-    }
-
-    const data = (await res.json()) as AuthResponse;
+    const data = (await safeJson(res)) as AuthResponse;
     console.log('✅ Login successful');
     
     // Save token to localStorage
