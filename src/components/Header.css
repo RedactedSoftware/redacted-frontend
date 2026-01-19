@@ -250,15 +250,15 @@
   }
 }
 
-/* Bottom Mobile Navbar */
+/* Bottom Mobile Navbar - NOW AT TOP */
 .mobile-bottom-navbar {
   display: none;
   position: fixed;
-  bottom: 0;
+  top: 0;
   left: 0;
   right: 0;
   background: #1e2742;
-  border-top: 1px solid #2d3a5e;
+  border-bottom: 1px solid #2d3a5e;
   padding: 8px 8px;
   z-index: 100;
   gap: 6px;
@@ -284,7 +284,7 @@
 
 .app.light .mobile-bottom-navbar {
   background: #e6eef8;
-  border-top-color: #cbd5f5;
+  border-bottom-color: #cbd5f5;
 }
 .app.light .header-title {
   color: #1f2933;

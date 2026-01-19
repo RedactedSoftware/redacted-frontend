@@ -29,14 +29,13 @@
   .dashboard {
     padding: 12px;
     max-width: 100%;
-    padding-bottom: 80px; /* Space for bottom navbar */
   }
 }
 
 @media (max-width: 640px) {
   .dashboard {
     padding: 10px;
-    padding-bottom: 80px; /* Space for bottom navbar */
+    padding-top: 90px; /* Space for top mobile navbar */
   }
 }
 

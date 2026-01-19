@@ -1,28 +1,21 @@
 // Service Worker for GPS Tracker Dashboard PWA
-const CACHE_NAME = 'gps-tracker-v3';
+const CACHE_NAME = 'gps-tracker-v4';
 
 // Install event
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing service worker v3');
+  console.log('[SW] Installing service worker v4');
   self.skipWaiting();
 });
 
-// Activate event - clean up old caches
+// Activate event - aggressively clean up old caches
 self.addEventListener('activate', (event) => {
   console.log('[SW] Activating service worker');
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('[SW] Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
-  );
-  self.clients.claim();
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => k !== CACHE_NAME ? caches.delete(k) : null));
+    console.log('[SW] Old caches deleted, claiming clients');
+    await self.clients.claim();
+  })());
 });
 
 // Fetch event - network first for everything, minimal caching
@@ -41,10 +34,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // NEVER cache API calls - avoid caching HTML error pages / fallback shells
-  // API responses must always come from network (NetworkOnly strategy)
+  // API: ALWAYS network, NEVER cache
+  // Use cache: 'no-store' to prevent any browser-level caching
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(fetch(request));
+    event.respondWith(
+      fetch(request, { cache: 'no-store' })
+    );
     return;
   }
 
