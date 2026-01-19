@@ -23,6 +23,13 @@ export async function signup(email: string, password: string): Promise<string> {
 
     const data = (await res.json()) as AuthResponse;
     console.log('✅ Signup successful');
+    
+    // Save token to localStorage
+    if (typeof window !== "undefined") {
+      localStorage.setItem("token", data.token);
+      console.log("💾 Token saved to localStorage (signup)");
+    }
+    
     return data.token;
   } catch (err: any) {
     console.error('❌ Signup exception:', err);
