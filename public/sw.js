@@ -1,9 +1,9 @@
 // Service Worker for GPS Tracker Dashboard PWA
-const CACHE_NAME = 'gps-tracker-v2';
+const CACHE_NAME = 'gps-tracker-v3';
 
 // Install event
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing service worker v2');
+  console.log('[SW] Installing service worker v3');
   self.skipWaiting();
 });
 
@@ -41,43 +41,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // NEVER cache telemetry data - must always get fresh updates
-  if (url.pathname.includes('/api/telemetry/')) {
-    event.respondWith(
-      fetch(request)
-        .catch(() => {
-          return caches.match(request).then((cachedResponse) => {
-            // Use cache as very last resort for offline
-            return cachedResponse || new Response('Offline', { status: 503 });
-          });
-        })
-    );
-    return;
-  }
-
-  // Network first for other API calls with cache fallback
+  // NEVER cache API calls - avoid caching HTML error pages / fallback shells
+  // API responses must always come from network (NetworkOnly strategy)
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, responseClone);
-            });
-          }
-          return response;
-        })
-        .catch(() => {
-          return caches.match(request).then((cachedResponse) => {
-            return cachedResponse || new Response('Offline', { status: 503 });
-          });
-        })
-    );
+    event.respondWith(fetch(request));
     return;
   }
 
-  // For everything else (HTML, CSS, images, etc), try network first
+  // For everything else (HTML, CSS, images, fonts, etc), cache with network fallback
   event.respondWith(
     fetch(request)
       .then((response) => {
