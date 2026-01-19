@@ -19,17 +19,19 @@ async function safeJson(res: Response) {
   const text = await res.text();
 
   if (!res.ok) {
-    throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+    const preview = text.startsWith("<") ? text.slice(0, 100) : text.slice(0, 200);
+    throw new Error(`HTTP ${res.status}: ${preview}...`);
   }
 
   if (!ct.includes("application/json")) {
-    throw new Error(`Expected JSON but got ${ct}. Body: ${text.slice(0, 200)}`);
+    const preview = text.startsWith("<") ? text.slice(0, 100) : text.slice(0, 100);
+    throw new Error(`Expected JSON, got ${ct}: ${preview}...`);
   }
 
   try {
     return JSON.parse(text);
   } catch (e) {
-    throw new Error(`Invalid JSON: ${text.slice(0, 100)}`);
+    throw new Error(`Failed to parse JSON: ${e}. Response: ${text.slice(0, 100)}`);
   }
 }
 
@@ -52,7 +54,8 @@ export function MyDevicesList({ token }: MyDevicesListProps) {
 
     try {
       const url = `${API_BASE}/api/devices`;
-      console.log("📱 devices fetch:", url);
+      console.log("📱 devices fetch URL:", url);
+      console.log("🔑 token present:", !!token);
 
       const res = await fetch(url, {
         headers: {
@@ -60,7 +63,12 @@ export function MyDevicesList({ token }: MyDevicesListProps) {
         },
       });
 
+      console.log("📨 devices response status:", res.status);
+      console.log("📨 devices response content-type:", res.headers.get("content-type"));
+
       const raw = await safeJson(res);
+      
+      console.log("✅ devices response parsed successfully:", raw.length, "devices");
       
       // Map backend response (device_id) to UI expectation (id)
       const mapped = raw.map((d: any) => ({
@@ -71,6 +79,7 @@ export function MyDevicesList({ token }: MyDevicesListProps) {
       
       setDevices(mapped);
     } catch (err: any) {
+      console.error("❌ loadDevices error:", err);
       setError(err.message || "Error loading devices");
     } finally {
       setLoading(false);

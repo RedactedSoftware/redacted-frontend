@@ -35,7 +35,9 @@ export default function useLiveTelemetry(selectedDeviceId, setters) {
             z: latest.accelerometer.z ?? null,
           });
         }
-      } catch {}
+      } catch (err) {
+        console.error("❌ useLiveTelemetry fetchDeviceData error:", err?.message || err);
+      }
     }, 150);
 
     const off = onWSMessage(handle);
