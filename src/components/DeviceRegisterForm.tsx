@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { API_BASE } from "@/api/constants";
 
 type DeviceRegisterFormProps = {
   token: string | null;
@@ -27,7 +26,7 @@ export function DeviceRegisterForm({ token }: DeviceRegisterFormProps) {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/api/devices/register`, {
+      const res = await fetch('/api/devices/register', {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

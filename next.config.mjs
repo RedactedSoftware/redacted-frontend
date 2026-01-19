@@ -11,9 +11,9 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://18.218.126.210:8082/:path*',
+        destination: process.env.API_ORIGIN + '/api/:path*',
       },
-    ]
+    ];
   },
   async headers() {
     return [

@@ -26,7 +26,7 @@ export default function SessionsHistoryPage() {
         const API_BASE =
           process.env.NEXT_PUBLIC_API_URL || "http://localhost:8082";
 
-        const res = await fetch(`${API_BASE}/api/sessions/history`, {
+        const res = await fetch('/api/sessions/history', {
           headers: {
             Authorization: `Bearer ${token}`,
           },

@@ -62,7 +62,7 @@ type TrainingLiveResponse = {
   note?: string;
 };
 
-import { API_BASE, WS_BASE } from "./api/constants";
+import { WS_BASE } from "./api/constants";
 
 const WS_URL = WS_BASE;
 const MAX_HISTORY = 25;
@@ -70,7 +70,6 @@ const MAX_HISTORY = 25;
 // Log env on startup
 if (typeof window !== "undefined") {
   console.log("🔌 Env Check: NEXT_PUBLIC_WS_URL:", WS_URL);
-  console.log("📡 Env Check: NEXT_PUBLIC_API_URL:", API_BASE);
 }
 
 function getSecureWebSocketUrl(url: string): string {
@@ -374,7 +373,7 @@ export default function Page() {
     async function tick() {
       try {
         const res = await fetch(
-          `${API_BASE}/api/training/live?device_id=${encodeURIComponent(id)}&window=120`,
+          `/api/training/live?device_id=${encodeURIComponent(id)}&window=120`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
