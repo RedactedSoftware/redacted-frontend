@@ -1,6 +1,4 @@
 // src/api/apiHelpers.js
-import { API_BASE } from './constants';
-
 // Safe JSON parser that validates content-type first
 async function safeJson(res) {
   const ct = res.headers.get("content-type") || "";
@@ -29,7 +27,7 @@ export async function fetchDeviceList() {
     return [];
   }
 
-  const url = `${API_BASE}/api/devices`;
+  const url = '/api/devices';
   console.log("📱 devices fetch:", url);
   console.log("📱 devices fetch:", url);
 
@@ -50,7 +48,7 @@ export async function fetchDeviceData(deviceId) {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   if (!token) throw new Error("No authentication token");
 
-  const url = `${API_BASE}/api/telemetry?device_id=${encodeURIComponent(deviceId)}&limit=1`;
+  const url = `/api/telemetry?device_id=${encodeURIComponent(deviceId)}&limit=1`;
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -99,7 +97,7 @@ export async function fetchDeviceSeries(deviceId, limit = 200) {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   if (!token) throw new Error("No authentication token");
 
-  const url = `${API_BASE}/api/telemetry?device_id=${encodeURIComponent(deviceId)}&limit=${limit}`;
+  const url = `/api/telemetry?device_id=${encodeURIComponent(deviceId)}&limit=${limit}`;
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -124,7 +122,7 @@ export async function fetchGyroSeries(deviceId, limit = 200) {
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   if (!token) throw new Error("No authentication token");
 
-  const url = `${API_BASE}/api/telemetry?device_id=${encodeURIComponent(deviceId)}&limit=${limit}`;
+  const url = `/api/telemetry?device_id=${encodeURIComponent(deviceId)}&limit=${limit}`;
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -146,7 +144,7 @@ export async function fetchGyroSeries(deviceId, limit = 200) {
 export async function fetchMyTelemetry(token) {
   if (!token) throw new Error("Missing auth token");
 
-  const url = `${API_BASE}/api/telemetry/my`;
+  const url = '/api/telemetry/my';
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,

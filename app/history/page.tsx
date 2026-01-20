@@ -68,12 +68,7 @@ export default function HistoryPage() {
           throw new Error("No token found - please log in");
         }
 
-        const API_BASE = process.env.NEXT_PUBLIC_API_URL;
-        if (!API_BASE) {
-          throw new Error("NEXT_PUBLIC_API_URL is not configured");
-        }
-
-        const response = await fetch(`${API_BASE}/api/sessions/history`, {
+        const response = await fetch('/api/sessions/history', {
           method: "GET",
           headers: {
             "Content-Type": "application/json",

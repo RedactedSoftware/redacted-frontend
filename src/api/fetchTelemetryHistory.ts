@@ -1,8 +1,5 @@
 
-
 // frontend/api/fetchTelemetryHistory.ts
-import { API_BASE } from './constants';
-
 export type TelemetryHistoryItem = {
   uid: string;
   device_id: string;
@@ -41,7 +38,7 @@ async function safeJson(res: Response) {
 }
 
 export async function fetchTelemetryHistory(): Promise<TelemetryHistoryItem[]> {
-  const url = `${API_BASE}/api/telemetry/history`;
+  const url = '/api/telemetry/history';
   console.log("📊 telemetry history fetch:", url);
 
   const res = await fetch(url);

@@ -1,6 +1,4 @@
 // API Configuration
-import { API_BASE } from './constants';
-
 // Safe JSON parser that validates content-type first
 async function safeJson(res: Response) {
   const ct = res.headers.get("content-type") || "";
@@ -29,8 +27,7 @@ export const fetchDeviceList = async () => {
     return [];
   }
 
-  const url = `${API_BASE}/api/devices`;
-  console.log("📱 devices fetch:", url);
+  const url = '/api/devices';
   console.log("📱 devices fetch:", url);
 
   try {
