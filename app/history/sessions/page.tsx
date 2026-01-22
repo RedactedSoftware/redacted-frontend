@@ -1,5 +1,5 @@
 "use client";
-
+import { API_BASE } from "src/api/constants";
 import { useEffect, useState } from "react";
 
 type SessionRow = {
@@ -23,7 +23,7 @@ export default function SessionsHistoryPage() {
           return;
         }
 
-        const res = await fetch('/api/sessions/history', {
+        const res = await fetch(`${API_BASE}/api/sessions/history`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

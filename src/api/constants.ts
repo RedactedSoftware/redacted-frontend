@@ -2,8 +2,12 @@
 // Rewrites are unreliable with service workers + caching + auth
 // Direct calls to your backend are boring and reliable.
 
-const API_URL_VALUE = process.env.NEXT_PUBLIC_API_URL;
-const WS_BASE_VALUE = process.env.NEXT_PUBLIC_WS_URL;
+export const API_URL_VALUE =
+  (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+
+export const WS_BASE_VALUE =
+  (process.env.NEXT_PUBLIC_WS_URL || "").replace(/\/$/, "");
+
 
 // In production, fail loudly if env vars are missing
 if (!API_URL_VALUE) {

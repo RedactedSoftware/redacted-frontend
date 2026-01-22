@@ -1,3 +1,6 @@
+import { API_BASE } from "../api/constants";
+const LOGIN_URL = `${API_BASE}/api/login`;
+const SIGNUP_URL = `${API_BASE}/api/signup`;
 // src/api/auth.ts
 type AuthResponse = {
   token: string;
@@ -25,8 +28,8 @@ async function safeJson(res: Response) {
 
 export async function signup(email: string, password: string): Promise<string> {
   try {
-    console.log('📤 Signup attempt to:', '/api/signup');
-    const res = await fetch('/api/signup', {
+    console.log('📤 Signup attempt to:', SIGNUP_URL);
+    const res = await fetch(SIGNUP_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -51,8 +54,8 @@ export async function signup(email: string, password: string): Promise<string> {
 
 export async function login(email: string, password: string): Promise<string> {
   try {
-    console.log('📤 Login attempt to:', '/api/login');
-    const res = await fetch('/api/login', {
+    console.log('📤 Login attempt to:', LOGIN_URL);
+    const res = await fetch(LOGIN_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),

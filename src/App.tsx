@@ -14,6 +14,7 @@ import GyroscopeChart from "./components/GyroscopeChart";
 import SatelliteChart from "./components/SatelliteChart";
 import IMUChart from "./components/IMUChart";
 import "./App.css";
+import { API_BASE } from "./api/constants";
 
 type Telemetry = {
   device_id: string;
@@ -311,7 +312,7 @@ export default function Page() {
           device_id: payload.device_id,
           device_ts: payload.device_ts ?? payload.timestamp ?? 0,
           heading_deg: payload.heading_deg ?? payload.heading ?? 0,
-          temp_c: payload.temp_c ?? payload.temp ?? null,
+          temp_c: payload.temp_c ?? payload.temperature_c ?? payload.temp ?? null,
           temperature: payload.temperature ?? null,
           battery_percent: payload.battery_percent ?? null,
           accel_x: payload.accel_x ?? payload.accelerometer?.x ?? null,
@@ -373,7 +374,7 @@ export default function Page() {
     async function tick() {
       try {
         const res = await fetch(
-          `/api/training/live?device_id=${encodeURIComponent(id)}&window=120`,
+          `${API_BASE}/api/training/live?device_id=${encodeURIComponent(id)}&window=120`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -730,7 +731,7 @@ export default function Page() {
 
         {/* Motion sensor charts */}
         <section className="two-column-grid">
-          <AccelerometerChart chartData={accelChartData} />
+          <AccelerometerChart data={accelChartData} />
           <GyroscopeChart chartData={gyroChartData} />
         </section>
 

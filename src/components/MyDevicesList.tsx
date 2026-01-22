@@ -1,5 +1,5 @@
 "use client";
-
+import { API_BASE } from "../api/constants";
 import { useEffect, useState } from "react";
 
 type Device = {
@@ -52,7 +52,7 @@ export function MyDevicesList({ token }: MyDevicesListProps) {
     }
 
     try {
-      const url = '/api/devices';
+      const url = `${API_BASE}/api/devices`;
       console.log("📱 devices fetch URL:", url);
       console.log("🔑 token present:", !!token);
 
@@ -102,7 +102,7 @@ export function MyDevicesList({ token }: MyDevicesListProps) {
     try {
       console.log(`🗑️ Deleting device: ${deviceId}`);
       
-      const res = await fetch(`/api/devices/${deviceId}`, {
+      const res = await fetch(`${API_BASE}/api/devices/${deviceId}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",

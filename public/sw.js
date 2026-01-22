@@ -21,25 +21,23 @@ self.addEventListener('activate', (event) => {
 // Fetch event - network first for everything, minimal caching
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  const url = new URL(request.url);
 
-  // Skip cross-origin requests and chrome extensions
-  if (url.origin !== location.origin) {
+  // 🔴 NEVER touch non-GET requests
+  if (request.method !== 'GET') {
     return;
   }
 
-  // NEVER cache _next chunks - always fetch fresh
+  const url = new URL(request.url);
+
+  if (url.origin !== location.origin) return;
+
   if (url.pathname.includes('/_next/')) {
     event.respondWith(fetch(request));
     return;
   }
 
-  // API: ALWAYS network, NEVER cache
-  // Use cache: 'no-store' to prevent any browser-level caching
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(
-      fetch(request, { cache: 'no-store' })
-    );
+    event.respondWith(fetch(request, { cache: 'no-store' }));
     return;
   }
 

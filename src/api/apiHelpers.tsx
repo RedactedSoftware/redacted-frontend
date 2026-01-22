@@ -1,5 +1,7 @@
 // API Configuration
 // Safe JSON parser that validates content-type first
+import { API_BASE } from "../api/constants"; // adjust path as needed
+
 async function safeJson(res: Response) {
   const ct = res.headers.get("content-type") || "";
   const text = await res.text();
@@ -21,13 +23,13 @@ async function safeJson(res: Response) {
 
 // Fetch devices - token gated, bulletproof
 export const fetchDeviceList = async () => {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
   if (!token) {
     console.warn("❌ fetchDeviceList: No token available");
     return [];
   }
 
-  const url = '/api/devices';
+  const url = `${API_BASE}/api/devices`;
   console.log("📱 devices fetch:", url);
 
   try {
